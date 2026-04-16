@@ -226,7 +226,7 @@
     A desktop debugger for Go powered by Delve. Imports configs from VS Code, Zed & GoLand. 8 themes. System tray. Auto-updates. Built with Wails + Svelte.
   </p>
   <div class="hero-cta">
-    <a href="https://github.com/Patrick-web/DelveUI/releases/latest" class="btn-brutal btn-fill">download_</a>
+    <a id="download-btn" href="https://github.com/Patrick-web/DelveUI/releases/latest" class="btn-brutal btn-fill">download_</a>
     <a href="#install" class="btn-brutal btn-outline">quick start_</a>
   </div>
 </div>
@@ -344,6 +344,35 @@
 </div>
 
 <script>
+  // Auto-detect OS and set download link to latest release asset
+  (async function() {
+    const btn = document.getElementById('download-btn');
+    const ua = navigator.userAgent.toLowerCase();
+    let os = 'macOS';
+    let ext = '.dmg';
+    if (ua.includes('win')) { os = 'Windows'; ext = '.zip'; }
+    else if (ua.includes('linux')) { os = 'Linux'; ext = '.tar.gz'; }
+
+    btn.textContent = `download for ${os}_`;
+
+    try {
+      const res = await fetch('https://api.github.com/repos/Patrick-web/DelveUI/releases/latest');
+      if (!res.ok) return;
+      const release = await res.json();
+      const asset = release.assets?.find(a => {
+        const name = a.name.toLowerCase();
+        if (os === 'macOS') return name.includes('macos') && name.endsWith('.dmg');
+        if (os === 'Windows') return name.includes('windows') && name.endsWith('.zip');
+        if (os === 'Linux') return name.includes('linux') && name.endsWith('.tar.gz');
+        return false;
+      });
+      if (asset) {
+        btn.href = asset.browser_download_url;
+        btn.textContent = `download for ${os}_ (${release.tag_name})`;
+      }
+    } catch {}
+  })();
+
   const lb = document.getElementById('lightbox');
   const lbImg = document.getElementById('lightbox-img');
   const lbLabel = document.getElementById('lightbox-label');
