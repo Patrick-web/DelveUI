@@ -55,11 +55,6 @@ func parseVSCode(path string, projectDir string) ([]config.LaunchConfig, error) 
 
 	var cfgs []config.LaunchConfig
 	for i, vc := range file.Configurations {
-		// Only import Go/Delve configs
-		if vc.Type != "go" && vc.Type != "dlv" && vc.Type != "" {
-			continue
-		}
-		// Resolve ${workspaceFolder}
 		program := resolveVSCodeVars(vc.Program, projectDir)
 		cwd := resolveVSCodeVars(vc.Cwd, projectDir)
 		envFile := resolveVSCodeVars(vc.EnvFile, projectDir)
@@ -74,10 +69,16 @@ func parseVSCode(path string, projectDir string) ([]config.LaunchConfig, error) 
 			buildFlags = strings.Fields(vc.BuildFlags)
 		}
 
-		cfgs = append(cfgs, config.LaunchConfig{
+		isGo := vc.Type == "go" || vc.Type == "dlv" || vc.Type == ""
+		lang := vc.Type
+		if lang == "" {
+			lang = "go"
+		}
+
+		cfg := config.LaunchConfig{
 			ID:         fmt.Sprintf("vscode-%d", i),
 			Label:      label,
-			Adapter:    "Delve",
+			Adapter:    or(vc.Type, "Delve"),
 			Request:    or(vc.Request, "launch"),
 			Mode:       or(vc.Mode, "debug"),
 			Program:    program,
@@ -86,7 +87,13 @@ func parseVSCode(path string, projectDir string) ([]config.LaunchConfig, error) 
 			Env:        vc.Env,
 			Args:       vc.Args,
 			BuildFlags: buildFlags,
-		})
+			Language:   lang,
+		}
+		if !isGo {
+			cfg.Disabled = true
+			cfg.DisabledNote = fmt.Sprintf("Only Go is supported (this config uses %q)", vc.Type)
+		}
+		cfgs = append(cfgs, cfg)
 	}
 	return cfgs, nil
 }

@@ -21,6 +21,7 @@
   import Toast from "./lib/Toast.svelte";
   import ImportWizard from "./lib/ImportWizard.svelte";
   import WelcomePage from "./lib/WelcomePage.svelte";
+  import ConfigPicker from "./lib/ConfigPicker.svelte";
   import Icon from "./lib/Icon.svelte";
   import { layout, setDockSize } from "./lib/panels/layout";
 
@@ -28,6 +29,7 @@
   let paletteOpen = false;
   let settingsOpen = false;
   let importWizardOpen = false;
+  let configPickerOpen = false;
   let showWelcome = false;
 
   onMount(async () => {
@@ -47,6 +49,7 @@
   });
 
   $: sessionList = Object.values($sessions);
+  $: availableCfgs = ($workspace?.configs ?? []).filter((c: any) => !c.disabled && !sessionList.some(s => s.cfgId === c.id));
 
   async function startFromPicker(cfgId: string) {
     cfgPickerOpen = false;
@@ -69,6 +72,7 @@
 />
 <SettingsPage bind:open={settingsOpen} onOpenImport={() => (importWizardOpen = true)} />
 <ImportWizard bind:open={importWizardOpen} />
+<ConfigPicker bind:open={configPickerOpen} onOpenImport={() => (importWizardOpen = true)} />
 <WelcomePage visible={showWelcome} onDone={() => { showWelcome = false; refreshWorkspace(); }} />
 <Toast />
 
@@ -78,8 +82,10 @@
     <!-- left: traffic light space + actions -->
     <div class="tb-left" data-wml-no-drag>
       <span class="logo">DelveUI</span>
-      <button class="btn outlined tb-btn" on:click={() => pickDebugFile()}>
-        <Icon icon="solar:document-bold" size={12} /> debug.json
+      <button class="btn outlined tb-btn" on:click={() => (configPickerOpen = true)} title="Switch debug configuration">
+        <Icon icon="solar:widget-bold" size={12} />
+        {$workspace?.debugFile ? $workspace.debugFile.split("/").slice(-3, -1).join("/") : "No project"}
+        <Icon icon="solar:alt-arrow-down-linear" size={10} />
       </button>
       <button class="btn icon tb-btn" title="Settings (⌘,)" on:click={() => (settingsOpen = true)}>
         <Icon icon="solar:settings-bold" size={13} />
@@ -120,10 +126,10 @@
         </button>
         {#if cfgPickerOpen}
           <div class="dd">
-            {#if !$workspace?.configs?.length}
-              <div class="dd-empty">Open a debug.json first</div>
+            {#if availableCfgs.length === 0}
+              <div class="dd-empty">{($workspace?.configs?.length ?? 0) > 0 ? "All configs are running" : "Open a project first"}</div>
             {/if}
-            {#each ($workspace?.configs ?? []).filter(c => !sessionList.some(s => s.cfgId === c.id)) as cfg}
+            {#each availableCfgs as cfg}
               <button class="dd-item" on:click={() => startFromPicker(cfg.id)}>
                 <Icon icon="solar:play-bold" size={12} color="var(--success)" />
                 <span>{cfg.label}</span>

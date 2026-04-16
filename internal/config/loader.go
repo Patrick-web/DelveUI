@@ -10,26 +10,42 @@ import (
 )
 
 type LaunchConfig struct {
-	ID         string            `json:"id"`
-	Label      string            `json:"label"`
-	Adapter    string            `json:"adapter"`
-	Request    string            `json:"request"`
-	Mode       string            `json:"mode"`
-	Program    string            `json:"program"`
-	Cwd        string            `json:"cwd"`
-	EnvFile    string            `json:"envFile"`
-	Env        map[string]string `json:"env"`
-	Args       []string          `json:"args"`
-	BuildFlags []string          `json:"buildFlags"`
+	ID           string            `json:"id"`
+	Label        string            `json:"label"`
+	Adapter      string            `json:"adapter"`
+	Request      string            `json:"request"`
+	Mode         string            `json:"mode"`
+	Program      string            `json:"program"`
+	Cwd          string            `json:"cwd"`
+	EnvFile      string            `json:"envFile"`
+	Env          map[string]string `json:"env"`
+	Args         []string          `json:"args"`
+	BuildFlags   []string          `json:"buildFlags"`
+	Disabled     bool              `json:"disabled,omitempty"`
+	DisabledNote string            `json:"disabledNote,omitempty"`
+	Language     string            `json:"language,omitempty"`
 }
 
-// LoadFromWorkspace looks for <dir>/.zed/debug.json and returns parsed configs.
+// LoadFromWorkspace looks for debug configs in a directory, checking multiple
+// editor locations: .zed/debug.json, .vscode/launch.json, .delveui/debug.json
 func LoadFromWorkspace(dir string) (string, []LaunchConfig, error) {
-	path := filepath.Join(dir, ".zed", "debug.json")
-	cfgs, err := LoadFile(path)
-	return path, cfgs, err
+	candidates := []string{
+		filepath.Join(dir, ".zed", "debug.json"),
+		filepath.Join(dir, ".vscode", "launch.json"),
+		filepath.Join(dir, ".delveui", "debug.json"),
+	}
+	for _, path := range candidates {
+		cfgs, err := LoadFile(path)
+		if err == nil && len(cfgs) > 0 {
+			return path, cfgs, nil
+		}
+	}
+	return "", nil, fmt.Errorf("no debug config found in %s", dir)
 }
 
+// LoadFile loads debug configs from a JSON file. Supports both:
+// - Zed format: bare JSON array of configs
+// - VS Code format: { "version": "...", "configurations": [...] }
 func LoadFile(path string) ([]LaunchConfig, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -39,6 +55,22 @@ func LoadFile(path string) ([]LaunchConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
+
+	// Try VS Code format first (object with configurations array)
+	var vscodeFile struct {
+		Configurations []LaunchConfig `json:"configurations"`
+	}
+	if json.Unmarshal(std, &vscodeFile) == nil && len(vscodeFile.Configurations) > 0 {
+		cfgs := vscodeFile.Configurations
+		for i := range cfgs {
+			if cfgs[i].ID == "" {
+				cfgs[i].ID = fmt.Sprintf("cfg-%d", i)
+			}
+		}
+		return cfgs, nil
+	}
+
+	// Fall back to Zed format (bare array)
 	var cfgs []LaunchConfig
 	if err := json.Unmarshal(std, &cfgs); err != nil {
 		return nil, fmt.Errorf("decode %s: %w", path, err)
@@ -46,6 +78,16 @@ func LoadFile(path string) ([]LaunchConfig, error) {
 	for i := range cfgs {
 		if cfgs[i].ID == "" {
 			cfgs[i].ID = fmt.Sprintf("cfg-%d", i)
+		}
+		// Mark non-Go configs as disabled
+		adapter := cfgs[i].Adapter
+		if adapter != "" && adapter != "Delve" && adapter != "delve" {
+			cfgs[i].Disabled = true
+			cfgs[i].DisabledNote = fmt.Sprintf("Only Go/Delve is supported (uses %q)", adapter)
+			cfgs[i].Language = adapter
+		}
+		if cfgs[i].Language == "" {
+			cfgs[i].Language = "go"
 		}
 	}
 	return cfgs, nil

@@ -89,6 +89,27 @@ export class LaunchConfig {
              */
             this["buildFlags"] = [];
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["disabled"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["disabledNote"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["language"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }

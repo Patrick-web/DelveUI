@@ -50,6 +50,13 @@ func (s *WorkspaceService) Configs() []config.LaunchConfig { return s.configs }
 func (s *WorkspaceService) Root() string                   { return s.root }
 func (s *WorkspaceService) DebugFile() string              { return s.debugFile }
 
+// ClearWorkspace resets the workspace to empty state (used after reset).
+func (s *WorkspaceService) ClearWorkspace() {
+	s.root = ""
+	s.debugFile = ""
+	s.configs = nil
+}
+
 func (s *WorkspaceService) Info() WorkspaceInfo {
 	info := WorkspaceInfo{Root: s.root, DebugFile: s.debugFile, Configs: s.configs, Recents: s.store.List()}
 	info.LoadedOK = len(s.configs) > 0 || (s.root == "" && s.debugFile == "")
@@ -83,17 +90,17 @@ func (s *WorkspaceService) PickDebugFile() (WorkspaceInfo, error) {
 		return s.Info(), errors.New("app not initialized")
 	}
 	opts := &application.OpenFileDialogOptions{
-		Title:                "Choose debug.json",
+		Title:                "Choose debug configuration file",
 		CanChooseFiles:       true,
 		CanChooseDirectories: false,
 		Filters: []application.FileFilter{
-			{DisplayName: "debug.json", Pattern: "*.json"},
+			{DisplayName: "Debug Config (*.json)", Pattern: "*.json"},
 		},
 	}
 	if s.debugFile != "" {
 		opts.Directory = filepath.Dir(s.debugFile)
 	} else if s.root != "" {
-		opts.Directory = filepath.Join(s.root, ".zed")
+		opts.Directory = s.root
 	}
 	dialog := s.app.Dialog.OpenFileWithOptions(opts)
 	path, err := dialog.PromptForSingleSelection()

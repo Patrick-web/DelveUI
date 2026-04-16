@@ -13,6 +13,12 @@ export type LaunchConfig = {
   program?: string;
   cwd?: string;
   envFile?: string;
+  env?: Record<string, string>;
+  args?: string[];
+  buildFlags?: string[];
+  disabled?: boolean;
+  disabledNote?: string;
+  language?: string;
 };
 
 export type SessionInfo = {

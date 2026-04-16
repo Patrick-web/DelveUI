@@ -100,7 +100,7 @@
     const runningSessions = Object.values($sessions);
     const runningCfgIds = new Set(runningSessions.map(s => s.cfgId));
     return ($workspace?.configs ?? [])
-      .filter(cfg => !runningCfgIds.has(cfg.id))
+      .filter(cfg => !cfg.disabled && !runningCfgIds.has(cfg.id))
       .map((cfg) => ({
         id: "start." + cfg.id,
         label: cfg.label,
