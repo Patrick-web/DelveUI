@@ -70,6 +70,110 @@ export class DetectedSource {
     }
 }
 
+export class FolderScanResult {
+    /**
+     * Creates a new FolderScanResult instance.
+     * @param {Partial<FolderScanResult>} [$$source = {}] - The source object to create the FolderScanResult.
+     */
+    constructor($$source = {}) {
+        if (!("editorConfigs" in $$source)) {
+            /**
+             * @member
+             * @type {DetectedSource[]}
+             */
+            this["editorConfigs"] = [];
+        }
+        if (!("runTargets" in $$source)) {
+            /**
+             * @member
+             * @type {RunTarget[]}
+             */
+            this["runTargets"] = [];
+        }
+        if (!("projectPath" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["projectPath"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new FolderScanResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {FolderScanResult}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType3;
+        const $$createField1_0 = $$createType5;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("editorConfigs" in $$parsedSource) {
+            $$parsedSource["editorConfigs"] = $$createField0_0($$parsedSource["editorConfigs"]);
+        }
+        if ("runTargets" in $$parsedSource) {
+            $$parsedSource["runTargets"] = $$createField1_0($$parsedSource["runTargets"]);
+        }
+        return new FolderScanResult(/** @type {Partial<FolderScanResult>} */($$parsedSource));
+    }
+}
+
+export class RunTarget {
+    /**
+     * Creates a new RunTarget instance.
+     * @param {Partial<RunTarget>} [$$source = {}] - The source object to create the RunTarget.
+     */
+    constructor($$source = {}) {
+        if (!("label" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["label"] = "";
+        }
+        if (!("kind" in $$source)) {
+            /**
+             * "run" or "test"
+             * @member
+             * @type {string}
+             */
+            this["kind"] = "";
+        }
+        if (!("package" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["package"] = "";
+        }
+        if (!("dir" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["dir"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new RunTarget instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {RunTarget}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new RunTarget(/** @type {Partial<RunTarget>} */($$parsedSource));
+    }
+}
+
 // Private type creation functions
 const $$createType0 = config$0.LaunchConfig.createFrom;
 const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = DetectedSource.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = RunTarget.createFrom;
+const $$createType5 = $Create.Array($$createType4);

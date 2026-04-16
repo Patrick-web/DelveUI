@@ -20,6 +20,7 @@
   import SettingsPage from "./lib/SettingsPage.svelte";
   import Toast from "./lib/Toast.svelte";
   import ImportWizard from "./lib/ImportWizard.svelte";
+  import WelcomePage from "./lib/WelcomePage.svelte";
   import Icon from "./lib/Icon.svelte";
   import { layout, setDockSize } from "./lib/panels/layout";
 
@@ -27,12 +28,22 @@
   let paletteOpen = false;
   let settingsOpen = false;
   let importWizardOpen = false;
+  let showWelcome = false;
 
   onMount(async () => {
     await refreshWorkspace();
     await refreshSessions();
     const list = Object.values($sessions);
     if (list.length && !$activeSessionId) activeSessionId.set(list[0].id);
+
+    // Show welcome on first launch (no configs loaded)
+    const { loadDebugFiles, debugFiles } = await import("./lib/settings-store");
+    await loadDebugFiles();
+    const { get } = await import("svelte/store");
+    const files = get(debugFiles);
+    if (files.length === 0 && !$workspace?.configs?.length) {
+      showWelcome = true;
+    }
   });
 
   $: sessionList = Object.values($sessions);
@@ -58,6 +69,7 @@
 />
 <SettingsPage bind:open={settingsOpen} onOpenImport={() => (importWizardOpen = true)} />
 <ImportWizard bind:open={importWizardOpen} />
+<WelcomePage visible={showWelcome} onDone={() => { showWelcome = false; refreshWorkspace(); }} />
 <Toast />
 
 <main>

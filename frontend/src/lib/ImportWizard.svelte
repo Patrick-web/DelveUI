@@ -25,14 +25,9 @@
   $: if (open && !scanned) scan();
 
   const editorIcons: Record<string, string> = {
-    "Zed": "solar:code-square-bold",
-    "VS Code": "solar:code-bold",
-    "GoLand": "solar:programming-bold",
-  };
-  const editorColors: Record<string, string> = {
-    "Zed": "#4fc3f7",
-    "VS Code": "#007acc",
-    "GoLand": "#fc801d",
+    "Zed": "devicon:zed",
+    "VS Code": "devicon:vscode",
+    "GoLand": "devicon:goland",
   };
 
   async function scan() {
@@ -128,8 +123,9 @@
     <div class="body">
       {#if scanning}
         <div class="status">
-          <Icon icon="solar:magnifer-bold" size={20} color="var(--text-faint)" />
+          <div class="spinner"></div>
           <span>Scanning your system for Go projects with debug configs…</span>
+          <span class="sub">This may take a moment on first run</span>
         </div>
       {:else if sources.length === 0}
         <div class="status">
@@ -147,7 +143,7 @@
               </div>
               {#each projectSources as s}
                 <div class="source">
-                  <Icon icon={editorIcons[s.editor] ?? "solar:code-bold"} size={16} color={editorColors[s.editor] ?? "var(--text-muted)"} />
+                  <Icon icon={editorIcons[s.editor] ?? "solar:code-bold"} size={16} />
                   <div class="source-info">
                     <span class="editor-name">{s.editor}</span>
                     <span class="config-count">{s.configCount} config{s.configCount !== 1 ? "s" : ""}</span>
@@ -214,6 +210,15 @@
   .status { display:flex; flex-direction:column; align-items:center; gap:var(--space-2); padding:var(--space-8) var(--space-4); color:var(--text-muted); font-size:var(--text-sm); text-align:center; }
   .status .sub { font-size:var(--text-xs); color:var(--text-faint); }
   .status code { background:var(--bg-subtle); padding:1px 4px; border-radius:3px; font-family:var(--font-mono); font-size:var(--text-xs); }
+
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   .project { margin-bottom:var(--space-3); }
   .project-header { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-1) 0; margin-bottom:var(--space-1); }

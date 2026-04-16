@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/wailsapp/wails/v3/pkg/application"
+
 	"github.com/jp/DelveUI/internal/config"
 	"github.com/jp/DelveUI/internal/debugfiles"
 )
@@ -13,16 +15,18 @@ import (
 // Service is exposed to the frontend via Wails bindings.
 type Service struct {
 	store *debugfiles.Store
+	app   *application.App
 }
 
 func NewService(store *debugfiles.Store) *Service {
 	return &Service{store: store}
 }
 
+func (s *Service) SetApp(app *application.App) { s.app = app }
+
 // Scan discovers debug configs from known editor locations across the system.
 func (s *Service) Scan() []DetectedSource {
 	var roots []string
-	// Also add paths from existing debug file entries
 	for _, e := range s.store.List() {
 		dir := filepath.Dir(e.Path)
 		// Walk up to find project root (parent of .zed/.vscode)
@@ -34,12 +38,12 @@ func (s *Service) Scan() []DetectedSource {
 		}
 		roots = append(roots, filepath.Dir(dir))
 	}
-	return Scan(roots)
+	return Scan(s.app, roots)
 }
 
 // ScanDir scans a specific directory (user-chosen via folder picker).
 func (s *Service) ScanDir(dir string) []DetectedSource {
-	return Scan([]string{dir})
+	return Scan(s.app, []string{dir})
 }
 
 // Import imports a detected source's config file into the debug files store.
@@ -90,6 +94,33 @@ func (s *Service) ImportAll(sources []DetectedSource) error {
 		}
 	}
 	return nil
+}
+
+// ScanFolder scans a specific folder for editor configs and Go run/test targets.
+func (s *Service) ScanFolder(dir string) FolderScanResult {
+	result := FolderScanResult{ProjectPath: dir}
+	result.EditorConfigs = scanProject(dir)
+	result.RunTargets = FindRunTargets(dir)
+	return result
+}
+
+// CreateConfigFromTargets writes a synthetic debug.json from run targets and imports it.
+func (s *Service) CreateConfigFromTargets(projectDir string, targets []RunTarget) error {
+	if len(targets) == 0 {
+		return fmt.Errorf("no targets")
+	}
+	cfgs := RunTargetsToConfigs(projectDir, targets)
+	dir := filepath.Join(projectDir, ".delveui")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	path := filepath.Join(dir, "debug.json")
+	data, _ := json.MarshalIndent(cfgs, "", "  ")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return err
+	}
+	_, err := s.store.Add(path)
+	return err
 }
 
 // IsImported checks if a config path is already in the debug files store.

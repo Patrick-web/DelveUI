@@ -8,5 +8,7 @@ export {
 };
 
 export {
-    DetectedSource
+    DetectedSource,
+    FolderScanResult,
+    RunTarget
 } from "./models.js";

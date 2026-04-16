@@ -20,6 +20,13 @@ export function Get() {
 }
 
 /**
+ * @returns {$CancellablePromise<void>}
+ */
+export function Reset() {
+    return $Call.ByID(224651517);
+}
+
+/**
  * @param {$models.Settings} next
  * @returns {$CancellablePromise<void>}
  */

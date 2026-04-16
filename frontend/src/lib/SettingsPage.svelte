@@ -23,8 +23,12 @@
     setTheme,
     loadTheme,
   } from "./theme-engine";
-  import { pickDebugFile, refreshWorkspace, openDebugFile } from "./store";
+  import { pickDebugFile, refreshWorkspace, openDebugFile, workspace } from "./store";
+  import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
+  import { showInfo, showError } from "./toast";
   import * as ThemeService from "../../bindings/github.com/jp/DelveUI/internal/themes/service";
+  import * as SettingsServiceBinding from "../../bindings/github.com/jp/DelveUI/internal/settings/service";
+  import * as DebugFilesStoreBinding from "../../bindings/github.com/jp/DelveUI/internal/debugfiles/store";
 
   export let open = false;
   export let onOpenImport: () => void = () => {};
@@ -181,6 +185,67 @@
   }
   async function switchToFile(entry: DebugFileEntry) { await openDebugFile(entry.path); await refreshWorkspace(); }
   async function installTheme() { try { const m = (await ThemeService.ImportFile("")) as any; if (m?.name) await refreshThemeList(); } catch {} }
+
+  let confirmAction: (() => Promise<void>) | null = null;
+  let confirmMessage = "";
+
+  function requestReset(msg: string, action: () => Promise<void>) {
+    confirmMessage = msg;
+    confirmAction = action;
+  }
+
+  async function executeReset() {
+    const action = confirmAction;
+    confirmAction = null;
+    confirmMessage = "";
+    if (action) await action();
+  }
+
+  function cancelReset() {
+    confirmAction = null;
+    confirmMessage = "";
+  }
+
+  function resetSettings() {
+    requestReset("Reset all settings to defaults?", async () => {
+      try {
+        await SettingsServiceBinding.Reset();
+        localStorage.clear();
+        showInfo("Settings reset", "All settings restored to defaults. Reloading…");
+        setTimeout(() => location.reload(), 1200);
+      } catch (e: any) {
+        showError("Reset failed", String(e?.message ?? e));
+      }
+    });
+  }
+
+  function resetDebugFiles() {
+    requestReset("Remove all saved debug files?", async () => {
+      try {
+        await DebugFilesStoreBinding.Clear();
+        await WorkspaceService.ClearWorkspace();
+        showInfo("Debug files cleared", "All saved debug files removed. Reloading…");
+        setTimeout(() => location.reload(), 1200);
+      } catch (e: any) {
+        showError("Reset failed", String(e?.message ?? e));
+      }
+    });
+  }
+
+  function resetEverything() {
+    requestReset("Reset everything? Settings, debug files, layout — all gone.", async () => {
+      try {
+        await SettingsServiceBinding.Reset();
+        await DebugFilesStoreBinding.Clear();
+        await WorkspaceService.ClearWorkspace();
+        localStorage.clear();
+        showInfo("Everything reset", "All data cleared. Reloading…");
+        setTimeout(() => location.reload(), 1200);
+      } catch (e: any) {
+        showError("Reset failed", String(e?.message ?? e));
+      }
+    });
+  }
 </script>
 
 {#if open}
@@ -387,8 +452,37 @@
           <span class="field-label">About</span>
           <div class="about">DelveUI — Delve debugger GUI for Go</div>
         </div>
+
+        <div class="field">
+          <span class="field-label">Reset</span>
+          <p class="desc">Clear all settings, debug files, and layout. App will restart in first-launch state.</p>
+          <div class="row">
+            <button class="btn danger" on:click={resetSettings}>
+              <Icon icon="solar:restart-bold" size={13} /> Reset Settings
+            </button>
+            <button class="btn danger" on:click={resetDebugFiles}>
+              <Icon icon="solar:trash-bin-minimalistic-bold" size={13} /> Clear Debug Files
+            </button>
+            <button class="btn danger" on:click={resetEverything}>
+              <Icon icon="solar:shield-warning-bold" size={13} /> Reset Everything
+            </button>
+          </div>
+        </div>
       {/if}
     </section>
+
+    {#if confirmAction}
+      <div class="confirm-overlay">
+        <div class="confirm-box">
+          <Icon icon="solar:shield-warning-bold" size={24} color="var(--danger)" />
+          <p>{confirmMessage}</p>
+          <div class="confirm-actions">
+            <button class="btn" on:click={cancelReset}>Cancel</button>
+            <button class="btn danger-fill" on:click={executeReset}>Confirm</button>
+          </div>
+        </div>
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -431,6 +525,23 @@
 
   .toggle { display:flex; align-items:center; gap:var(--space-2); cursor:pointer; font-size:var(--text-sm); color:var(--text); }
   .toggle input { accent-color:var(--accent); }
+
+  .confirm-overlay {
+    position:absolute; inset:0; background:rgba(0,0,0,0.5);
+    display:flex; align-items:center; justify-content:center; z-index:10;
+    border-radius:var(--radius-md);
+  }
+  .confirm-box {
+    background:var(--bg-elevated); border:1px solid var(--border);
+    border-radius:var(--radius-md); padding:var(--space-6);
+    display:flex; flex-direction:column; align-items:center; gap:var(--space-3);
+    max-width:360px; text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,0.4);
+  }
+  .confirm-box p { color:var(--text); font-size:var(--text-sm); margin:0; }
+  .confirm-actions { display:flex; gap:var(--space-2); }
+  .danger-fill { background:var(--danger); color:#fff; border-color:var(--danger); }
+  .danger-fill:hover { background:#c95a62; }
 
   .dock-section { margin-bottom:var(--space-4); }
   .panel-list { display:flex; flex-direction:column; gap:var(--space-1); }

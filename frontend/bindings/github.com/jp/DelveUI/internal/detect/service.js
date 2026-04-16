@@ -14,10 +14,23 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as config$0 from "../config/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
+
+/**
+ * CreateConfigFromTargets writes a synthetic debug.json from run targets and imports it.
+ * @param {string} projectDir
+ * @param {$models.RunTarget[]} targets
+ * @returns {$CancellablePromise<void>}
+ */
+export function CreateConfigFromTargets(projectDir, targets) {
+    return $Call.ByID(593295708, projectDir, targets);
+}
 
 /**
  * Import imports a detected source's config file into the debug files store.
@@ -79,6 +92,26 @@ export function ScanDir(dir) {
     }));
 }
 
+/**
+ * ScanFolder scans a specific folder for editor configs and Go run/test targets.
+ * @param {string} dir
+ * @returns {$CancellablePromise<$models.FolderScanResult>}
+ */
+export function ScanFolder(dir) {
+    return $Call.ByID(2996424521, dir).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType2($result);
+    }));
+}
+
+/**
+ * @param {application$0.App | null} app
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetApp(app) {
+    return $Call.ByID(3479422059, app);
+}
+
 // Private type creation functions
 const $$createType0 = $models.DetectedSource.createFrom;
 const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = $models.FolderScanResult.createFrom;

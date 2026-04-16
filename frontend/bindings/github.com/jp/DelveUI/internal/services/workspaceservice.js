@@ -23,6 +23,14 @@ import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/mo
 import * as $models from "./models.js";
 
 /**
+ * ClearWorkspace resets the workspace to empty state (used after reset).
+ * @returns {$CancellablePromise<void>}
+ */
+export function ClearWorkspace() {
+    return $Call.ByID(468020086);
+}
+
+/**
  * @returns {$CancellablePromise<config$0.LaunchConfig[]>}
  */
 export function Configs() {

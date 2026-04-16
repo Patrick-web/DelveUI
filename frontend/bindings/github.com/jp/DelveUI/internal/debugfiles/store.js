@@ -21,6 +21,13 @@ export function Add(path) {
 }
 
 /**
+ * @returns {$CancellablePromise<void>}
+ */
+export function Clear() {
+    return $Call.ByID(435842770);
+}
+
+/**
  * @returns {$CancellablePromise<$models.Entry | null>}
  */
 export function GetDefault() {
