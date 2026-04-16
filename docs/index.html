@@ -159,6 +159,40 @@
     font-size:12px; color:var(--gray);
   }
 
+  /* lightbox */
+  .lightbox {
+    position:fixed; inset:0; z-index:200;
+    background:rgba(0,0,0,0); backdrop-filter:blur(0px);
+    display:flex; align-items:center; justify-content:center;
+    cursor:zoom-out; pointer-events:none; opacity:0;
+    transition:background 0.3s, backdrop-filter 0.3s, opacity 0.3s;
+  }
+  .lightbox.open { background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); pointer-events:auto; opacity:1; }
+  .lightbox img {
+    max-width:90vw; max-height:85vh; border:1px solid #222;
+    transform:scale(0.9); opacity:0;
+    transition:transform 0.35s cubic-bezier(0.2,0.8,0.2,1), opacity 0.3s;
+  }
+  .lightbox.open img { transform:scale(1); opacity:1; }
+  .lightbox-label {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:1px; color:var(--green);
+    opacity:0; transition:opacity 0.3s 0.15s;
+  }
+  .lightbox.open .lightbox-label { opacity:1; }
+  .lightbox-close {
+    position:fixed; top:16px; right:20px;
+    background:none; border:1px solid #333; color:var(--gray);
+    font-family:var(--font); font-size:12px; padding:6px 14px;
+    cursor:pointer; text-transform:uppercase; letter-spacing:1px;
+    opacity:0; transition:opacity 0.3s 0.1s;
+  }
+  .lightbox.open .lightbox-close { opacity:1; }
+  .lightbox-close:hover { color:var(--white); border-color:var(--white); }
+
+  .gallery-item, .shot { cursor:zoom-in; }
+
   @media (max-width:640px) {
     .feat-grid, .gallery-grid { grid-template-columns:1fr; }
     .stats { grid-template-columns:1fr 1fr; }
@@ -302,6 +336,34 @@
 <footer>
   <p>MIT License · Built by <a href="https://github.com/Patrick-web">Patrick-web</a> · <a href="https://github.com/Patrick-web/DelveUI">Source on GitHub</a></p>
 </footer>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">esc · close</button>
+  <img id="lightbox-img" src="" alt="">
+  <div class="lightbox-label" id="lightbox-label"></div>
+</div>
+
+<script>
+  const lb = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lightbox-img');
+  const lbLabel = document.getElementById('lightbox-label');
+
+  document.querySelectorAll('.gallery-item img, .shot img').forEach(img => {
+    img.addEventListener('click', () => {
+      lbImg.src = img.src;
+      lbLabel.textContent = img.alt || '';
+      lb.classList.add('open');
+    });
+  });
+
+  function closeLightbox() {
+    lb.classList.remove('open');
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeLightbox();
+  });
+</script>
 
 </body>
 </html>
