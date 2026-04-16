@@ -8,6 +8,8 @@ A native desktop GUI for the [Delve](https://github.com/go-delve/delve) Go debug
 ![Windows](https://img.shields.io/badge/Windows-0078D4?logo=windows&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
 
+![Debug Session](docs/screenshots/debug-session.png)
+
 ## Features
 
 - **Full DAP client** — launch, breakpoints, stepping, call stack, variables, evaluate
@@ -46,6 +48,16 @@ wails3 build
 ```
 
 The app opens maximized. On first launch, it scans your system for existing debug configurations and offers to import them.
+
+## Screenshots
+
+| Welcome & Auto-Detection | Command Palette |
+|---|---|
+| ![Welcome](docs/screenshots/welcome.png) | ![Command Palette](docs/screenshots/command-palette.png) |
+
+| Settings | Debug Session |
+|---|---|
+| ![Settings](docs/screenshots/settings.png) | ![Debug Session](docs/screenshots/debug-session.png) |
 
 ## Usage
 
