@@ -19,12 +19,14 @@
   import CommandPalette from "./lib/CommandPalette.svelte";
   import SettingsPage from "./lib/SettingsPage.svelte";
   import Toast from "./lib/Toast.svelte";
+  import ImportWizard from "./lib/ImportWizard.svelte";
   import Icon from "./lib/Icon.svelte";
   import { layout, setDockSize } from "./lib/panels/layout";
 
   let cfgPickerOpen = false;
   let paletteOpen = false;
   let settingsOpen = false;
+  let importWizardOpen = false;
 
   onMount(async () => {
     await refreshWorkspace();
@@ -52,8 +54,10 @@
 <CommandPalette
   bind:open={paletteOpen}
   onOpenSettings={() => (settingsOpen = true)}
+  onOpenImport={() => (importWizardOpen = true)}
 />
-<SettingsPage bind:open={settingsOpen} />
+<SettingsPage bind:open={settingsOpen} onOpenImport={() => (importWizardOpen = true)} />
+<ImportWizard bind:open={importWizardOpen} />
 <Toast />
 
 <main>

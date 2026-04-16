@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/jp/DelveUI/internal/debugfiles"
+	"github.com/jp/DelveUI/internal/detect"
 	"github.com/jp/DelveUI/internal/services"
 	"github.com/jp/DelveUI/internal/session"
 	"github.com/jp/DelveUI/internal/settings"
@@ -49,6 +50,7 @@ func main() {
 	_ = dbgFiles.ReloadAll()
 
 	updateSvc := updater.NewService(version)
+	detectSvc := detect.NewService(dbgFiles)
 
 	wsSvc := services.NewWorkspaceService(store)
 	sessSvc := services.NewSessionService(mgr, wsSvc)
@@ -70,6 +72,7 @@ func main() {
 			application.NewService(settingsSvc),
 			application.NewService(dbgFiles),
 			application.NewService(updateSvc),
+			application.NewService(detectSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

@@ -27,6 +27,7 @@
   import * as ThemeService from "../../bindings/github.com/jp/DelveUI/internal/themes/service";
 
   export let open = false;
+  export let onOpenImport: () => void = () => {};
 
   type Tab = "appearance" | "terminal" | "panels" | "debugfiles" | "general";
   const allTabs: Tab[] = ["appearance", "terminal", "panels", "debugfiles", "general"];
@@ -328,9 +329,14 @@
       {:else if tab === "debugfiles"}
         <h2>Debug Files</h2>
         <p class="desc">Manage debug.json files. The default file auto-loads on app launch.</p>
-        <button class="btn primary" on:click={addFile}>
-          <Icon icon="solar:add-circle-bold" size={13} /> Add debug.json
-        </button>
+        <div class="row" style="margin-bottom: var(--space-3)">
+          <button class="btn primary" on:click={addFile}>
+            <Icon icon="solar:add-circle-bold" size={13} /> Add debug.json
+          </button>
+          <button class="btn outlined" on:click={() => { close(); onOpenImport(); }}>
+            <Icon icon="solar:magnifer-bold" size={13} /> Auto-detect from editors
+          </button>
+        </div>
         <div class="file-list">
           {#each $debugFiles as f}
             <div class="file-row" tabindex="0">

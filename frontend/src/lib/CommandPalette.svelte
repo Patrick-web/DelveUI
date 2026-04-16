@@ -23,6 +23,7 @@
 
   export let open = false;
   export let onOpenSettings: () => void = () => {};
+  export let onOpenImport: () => void = () => {};
 
   type Mode = "commands" | "themes" | "run";
   let mode: Mode = "commands";
@@ -74,6 +75,11 @@
         id: "workspace.openJson",
         label: "Workspace: Open debug.json…",
         run: () => pickDebugFile(),
+      },
+      {
+        id: "debugfiles.detect",
+        label: "Debug Files: Auto-detect configs…",
+        run: () => onOpenImport(),
       },
       { id: "view.left", label: "View: Toggle Left Dock", run: () => toggleDock("left") },
       { id: "view.right", label: "View: Toggle Right Dock", run: () => toggleDock("right") },
