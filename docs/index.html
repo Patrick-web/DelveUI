@@ -17,7 +17,7 @@
     --yellow: #ffcc00;
     --red: #ff3b3b;
     --gray: #888;
-    --border: 3px solid var(--white);
+    --border: 1.5px solid var(--white);
     --font: 'IBM Plex Mono', 'Space Mono', monospace;
   }
   html { scroll-behavior:smooth; }
@@ -67,7 +67,7 @@
   .btn-brutal {
     display:inline-block; padding:14px 32px; font-family:var(--font);
     font-size:14px; font-weight:700; text-transform:uppercase;
-    letter-spacing:1px; border:3px solid var(--white); cursor:pointer;
+    letter-spacing:1px; border:1.5px solid var(--white); cursor:pointer;
     text-decoration:none; transition:transform 0.1s, box-shadow 0.1s;
   }
   .btn-brutal:hover { transform:translate(-2px,-2px); box-shadow:4px 4px 0 var(--white); text-decoration:none; }
@@ -81,7 +81,7 @@
     border-left:var(--border); border-right:var(--border);
   }
   .shot img {
-    width:100%; border:3px solid var(--white);
+    width:100%; border:1.5px solid var(--white);
     box-shadow:8px 8px 0 var(--green);
   }
 
@@ -110,26 +110,26 @@
   .feat-icon {
     font-size:24px; margin-bottom:12px; display:block;
     width:44px; height:44px; line-height:44px; text-align:center;
-    border:2px solid var(--green); color:var(--green);
+    border:1px solid var(--green); color:var(--green);
   }
   .feat h3 { font-size:14px; font-weight:700; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
   .feat p { font-size:13px; color:var(--gray); line-height:1.5; }
 
   /* GALLERY */
   .gallery-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  .gallery-item { position:relative; overflow:hidden; border:3px solid #222; }
+  .gallery-item { position:relative; overflow:hidden; border:1.5px solid #222; }
   .gallery-item:hover { border-color:var(--white); }
   .gallery-item img { width:100%; display:block; }
   .gallery-label {
     position:absolute; bottom:0; left:0;
-    background:var(--black); border-top:2px solid var(--green);
+    background:var(--black); border-top:1px solid var(--green);
     padding:8px 12px; font-size:11px; font-weight:700;
     text-transform:uppercase; letter-spacing:1px; color:var(--green);
   }
 
   /* INSTALL */
   .install-block {
-    background:#0d0d0d; border:3px solid #222; padding:24px;
+    background:#0d0d0d; border:1.5px solid #222; padding:24px;
     position:relative; overflow-x:auto;
   }
   .install-block::before {
