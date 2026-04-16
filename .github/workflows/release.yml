@@ -98,11 +98,11 @@ jobs:
       - name: Install Wails v3 CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
       - name: Install frontend deps
-        run: npm --prefix frontend install
+        run: cd frontend && npm install
       - name: Generate bindings
         run: wails3 generate bindings
       - name: Build frontend
-        run: npm --prefix frontend run build
+        run: cd frontend && npm run build
       - name: Build binary
         run: go build -tags production -trimpath -ldflags="-w -s -X main.version=${{ github.ref_name }}" -o DelveUI.exe .
       - name: Package
