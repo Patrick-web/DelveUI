@@ -53,10 +53,18 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.ref_name }}" DelveUI.app/Contents/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ github.ref_name }}" DelveUI.app/Contents/Info.plist
           codesign --force --deep --sign "Developer ID Application: Patrick Waweru (Q79K8A6H7U)" --entitlements build/darwin/entitlements.plist DelveUI.app
-      - name: Create zip + DMG
+      - name: Create zip + DMG with Applications shortcut
         run: |
           ditto -c -k --sequesterRsrc --keepParent DelveUI.app DelveUI-macOS-${{ github.ref_name }}.zip
-          hdiutil create -volname "DelveUI" -srcfolder DelveUI.app -ov -format UDZO DelveUI-macOS-${{ github.ref_name }}.dmg
+
+          # Create a staging folder with the app + Applications symlink
+          mkdir -p dmg-staging
+          cp -R DelveUI.app dmg-staging/
+          ln -s /Applications dmg-staging/Applications
+
+          # Create the DMG
+          hdiutil create -volname "DelveUI" -srcfolder dmg-staging -ov -format UDZO DelveUI-macOS-${{ github.ref_name }}.dmg
+          rm -rf dmg-staging
       - uses: actions/upload-artifact@v5
         with:
           name: macos
