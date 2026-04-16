@@ -38,7 +38,7 @@ jobs:
           cp build/darwin/Info.plist DelveUI.app/Contents/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.ref_name }}" DelveUI.app/Contents/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ github.ref_name }}" DelveUI.app/Contents/Info.plist
-          codesign --force --deep --sign - DelveUI.app
+          codesign --force --deep --sign - --entitlements build/darwin/entitlements.plist DelveUI.app
       - name: Create zip + DMG
         run: |
           ditto -c -k --sequesterRsrc --keepParent DelveUI.app DelveUI-macOS-${{ github.ref_name }}.zip

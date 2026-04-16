@@ -15,6 +15,7 @@ type Settings struct {
 	BufferFontSize int    `json:"bufferFontSize"`
 	TermFontSize   int    `json:"termFontSize"`
 	LineHeight     string `json:"lineHeight"`
+	DlvPath        string `json:"dlvPath"`
 
 	LeftPanels     []string `json:"leftPanels"`
 	RightPanels    []string `json:"rightPanels"`

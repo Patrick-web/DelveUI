@@ -31,7 +31,7 @@ func main() {
 	}
 	mgr, err := session.NewManager()
 	if err != nil {
-		log.Printf("warning: %v (tray will still start; install dlv to use)", err)
+		log.Printf("warning: %v", err)
 		mgr = &session.Manager{}
 	}
 
@@ -48,6 +48,11 @@ func main() {
 		log.Fatal(err)
 	}
 	_ = dbgFiles.ReloadAll()
+
+	// If user configured a custom dlv path in settings, use it
+	if s := settingsSvc.Get(); s.DlvPath != "" {
+		mgr.SetDlvPath(s.DlvPath)
+	}
 
 	updateSvc := updater.NewService(version)
 	detectSvc := detect.NewService(dbgFiles)

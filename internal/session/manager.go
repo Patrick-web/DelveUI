@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 
@@ -19,11 +20,44 @@ type Manager struct {
 }
 
 func NewManager() (*Manager, error) {
-	dlv, err := exec.LookPath("dlv")
-	if err != nil {
-		return nil, fmt.Errorf("dlv not found on PATH: %w", err)
+	dlv := findDlv()
+	if dlv == "" {
+		return &Manager{sessions: make(map[string]*Session)}, fmt.Errorf("dlv not found — install with: go install github.com/go-delve/delve/cmd/dlv@latest")
 	}
 	return &Manager{sessions: make(map[string]*Session), dlvPath: dlv}, nil
+}
+
+// findDlv searches PATH and common install locations for the dlv binary.
+func findDlv() string {
+	// Try PATH first
+	if p, err := exec.LookPath("dlv"); err == nil {
+		return p
+	}
+
+	// Common locations when launched as a .app (minimal PATH)
+	home, _ := os.UserHomeDir()
+	candidates := []string{
+		"/usr/local/bin/dlv",
+		"/opt/homebrew/bin/dlv",
+		"/usr/local/go/bin/dlv",
+	}
+	if home != "" {
+		candidates = append(candidates,
+			home+"/go/bin/dlv",
+			home+"/.local/bin/dlv",
+			home+"/bin/dlv",
+		)
+		// Check GOPATH/bin if GOPATH is set
+		if gp := os.Getenv("GOPATH"); gp != "" {
+			candidates = append(candidates, gp+"/bin/dlv")
+		}
+	}
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
 }
 
 func (m *Manager) DlvPath() string { return m.dlvPath }

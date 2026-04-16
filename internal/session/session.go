@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -101,6 +102,7 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 		cmd.Dir = s.Cfg.Program
 	}
 	cmd.SysProcAttr = processSysProcAttr()
+	cmd.Env = enrichedEnv()
 	cmd.Stdout = logWriter{s: s, cat: "dlv-stdout"}
 	cmd.Stderr = logWriter{s: s, cat: "dlv-stderr"}
 	if err := cmd.Start(); err != nil {
@@ -198,6 +200,33 @@ type logWriter struct {
 func (w logWriter) Write(p []byte) (int, error) {
 	w.s.emit(Event{Kind: "output", Output: string(p), Category: w.cat})
 	return len(p), nil
+}
+
+// enrichedEnv returns the current env with common Go/bin paths added to PATH.
+// macOS .app bundles have a minimal PATH; this ensures `go`, `dlv`, etc. are reachable.
+func enrichedEnv() []string {
+	env := os.Environ()
+	home, _ := os.UserHomeDir()
+	extraPaths := []string{
+		"/usr/local/bin",
+		"/opt/homebrew/bin",
+		"/usr/local/go/bin",
+	}
+	if home != "" {
+		extraPaths = append(extraPaths, home+"/go/bin", home+"/.local/bin", home+"/bin")
+	}
+	if gp := os.Getenv("GOPATH"); gp != "" {
+		extraPaths = append(extraPaths, gp+"/bin")
+	}
+
+	for i, e := range env {
+		if strings.HasPrefix(e, "PATH=") {
+			env[i] = e + ":" + strings.Join(extraPaths, ":")
+			return env
+		}
+	}
+	env = append(env, "PATH="+strings.Join(extraPaths, ":"))
+	return env
 }
 
 func freePort() (int, error) {
