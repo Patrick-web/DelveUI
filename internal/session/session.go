@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	godap "github.com/google/go-dap"
@@ -101,7 +100,7 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 	} else if s.Cfg.Program != "" {
 		cmd.Dir = s.Cfg.Program
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.SysProcAttr = processSysProcAttr()
 	cmd.Stdout = logWriter{s: s, cat: "dlv-stdout"}
 	cmd.Stderr = logWriter{s: s, cat: "dlv-stderr"}
 	if err := cmd.Start(); err != nil {
@@ -188,18 +187,7 @@ func (s *Session) stop() {
 }
 
 func (s *Session) killProcess() {
-	if s.cmd == nil || s.cmd.Process == nil {
-		return
-	}
-	// Kill the dlv process and its children (the debuggee).
-	// Send SIGKILL to the process group to ensure the debuggee dies too.
-	pid := s.cmd.Process.Pid
-	if pid > 0 {
-		// Kill process group (negative PID kills the group)
-		_ = syscall.Kill(-pid, syscall.SIGKILL)
-		// Fallback: kill the process directly
-		_ = s.cmd.Process.Kill()
-	}
+	killProcessGroup(s.cmd)
 }
 
 type logWriter struct {

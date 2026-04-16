@@ -1,6 +1,7 @@
 package tray
 
 import (
+	_ "embed"
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -9,44 +10,34 @@ import (
 	"github.com/jp/DelveUI/internal/session"
 )
 
+//go:embed icon.png
+var trayIcon []byte
+
 type Controller struct {
-	app      *application.App
-	tray     *application.SystemTray
-	mainWin  application.Window
-	trayWin  application.Window
-	ws       *services.WorkspaceService
-	sess     *services.SessionService
-	mgr      *session.Manager
-	mu       sync.Mutex
+	app     *application.App
+	tray    *application.SystemTray
+	mainWin application.Window
+	trayWin application.Window
+	ws      *services.WorkspaceService
+	sess    *services.SessionService
+	mgr     *session.Manager
+	mu      sync.Mutex
 }
 
 func New(app *application.App, mainWin application.Window, ws *services.WorkspaceService, sess *services.SessionService, mgr *session.Manager) *Controller {
 	c := &Controller{app: app, mainWin: mainWin, ws: ws, sess: sess, mgr: mgr}
 
-	// Create hidden tray popup window
-	c.trayWin = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "DelveUI Sessions",
-		Width:            360,
-		Height:           420,
-		Hidden:           true,
-		Frameless:        true,
-		AlwaysOnTop:      true,
-		BackgroundColour: application.NewRGB(27, 29, 34),
-		URL:              "/tray.html",
-		Mac: application.MacWindow{
-			Backdrop: application.MacBackdropTranslucent,
-			TitleBar: application.MacTitleBarHidden,
-		},
-	})
-
 	c.tray = app.SystemTray.New()
-	c.tray.SetLabel("DUI")
 	c.tray.SetTooltip("DelveUI")
+	c.tray.SetIcon(trayIcon)
 
-	// Left-click: toggle attached tray window
-	c.tray.AttachWindow(c.trayWin).WindowOffset(4)
+	// Create tray popup window (platform-specific options applied below)
+	c.trayWin = app.Window.NewWithOptions(trayWindowOptions())
 
-	// Right-click: show the config menu (start/stop sessions)
+	// Platform-specific: attach window on macOS, click handler on other platforms
+	configureTray(c)
+
+	// Right-click always shows the config menu
 	c.tray.OnRightClick(func() {
 		c.tray.OpenMenu()
 	})
@@ -57,7 +48,6 @@ func New(app *application.App, mainWin application.Window, ws *services.Workspac
 	go func() {
 		for range ch {
 			application.InvokeAsync(c.Rebuild)
-			// Push session updates to tray window
 			c.app.Event.Emit("tray:sessions-changed", true)
 		}
 	}()
@@ -111,19 +101,6 @@ func (c *Controller) Rebuild() {
 	})
 
 	c.tray.SetMenu(menu)
-
-	anyRunning := false
-	for _, s := range c.mgr.List() {
-		if s.State() == session.StateRunning || s.State() == session.StateStopped {
-			anyRunning = true
-			break
-		}
-	}
-	if anyRunning {
-		c.tray.SetLabel("● DUI")
-	} else {
-		c.tray.SetLabel("DUI")
-	}
 }
 
 func (c *Controller) pickFile() {

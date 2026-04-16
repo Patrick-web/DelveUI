@@ -13,33 +13,22 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Install Wails v3 CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
-
       - name: Install frontend deps
         run: npm --prefix frontend install
-
       - name: Generate bindings
         run: wails3 generate bindings
-
       - name: Build frontend
         run: npm --prefix frontend run build
-
-      - name: Build macOS binary
-        run: |
-          go build -tags production -trimpath -ldflags="-w -s -X main.version=${{ github.ref_name }}" -o DelveUI .
-
+      - name: Build binary
+        run: go build -tags production -trimpath -ldflags="-w -s -X main.version=${{ github.ref_name }}" -o DelveUI .
       - name: Create .app bundle
         run: |
           mkdir -p DelveUI.app/Contents/MacOS
@@ -47,25 +36,98 @@ jobs:
           cp DelveUI DelveUI.app/Contents/MacOS/
           cp build/darwin/icons.icns DelveUI.app/Contents/Resources/
           cp build/darwin/Info.plist DelveUI.app/Contents/Info.plist
-          # Update version in plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.ref_name }}" DelveUI.app/Contents/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ github.ref_name }}" DelveUI.app/Contents/Info.plist
           codesign --force --deep --sign - DelveUI.app
-
-      - name: Create zip
+      - name: Create zip + DMG
         run: |
           ditto -c -k --sequesterRsrc --keepParent DelveUI.app DelveUI-macOS-${{ github.ref_name }}.zip
-
-      - name: Create DMG
-        run: |
           hdiutil create -volname "DelveUI" -srcfolder DelveUI.app -ov -format UDZO DelveUI-macOS-${{ github.ref_name }}.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            DelveUI-macOS-*.zip
+            DelveUI-macOS-*.dmg
 
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Install Wails v3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+      - name: Install frontend deps
+        run: npm --prefix frontend install
+      - name: Generate bindings
+        run: wails3 generate bindings
+      - name: Build frontend
+        run: npm --prefix frontend run build
+      - name: Build binary
+        run: go build -tags production -trimpath -ldflags="-w -s -X main.version=${{ github.ref_name }}" -o DelveUI .
+      - name: Package
+        run: |
+          mkdir -p DelveUI-linux
+          cp DelveUI DelveUI-linux/
+          cp build/appicon.png DelveUI-linux/delveui.png
+          tar czf DelveUI-linux-${{ github.ref_name }}.tar.gz DelveUI-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: DelveUI-linux-*.tar.gz
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Wails v3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+      - name: Install frontend deps
+        run: npm --prefix frontend install
+      - name: Generate bindings
+        run: wails3 generate bindings
+      - name: Build frontend
+        run: npm --prefix frontend run build
+      - name: Build binary
+        run: go build -tags production -trimpath -ldflags="-w -s -X main.version=${{ github.ref_name }}" -o DelveUI.exe .
+      - name: Package
+        run: Compress-Archive -Path DelveUI.exe -DestinationPath DelveUI-windows-${{ github.ref_name }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: DelveUI-windows-*.zip
+
+  release:
+    needs: [build-macos, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: List artifacts
+        run: ls -la
+      - uses: softprops/action-gh-release@v2
         with:
           files: |
-            DelveUI-macOS-${{ github.ref_name }}.zip
-            DelveUI-macOS-${{ github.ref_name }}.dmg
+            DelveUI-macOS-*.zip
+            DelveUI-macOS-*.dmg
+            DelveUI-linux-*.tar.gz
+            DelveUI-windows-*.zip
           generate_release_notes: true
           draft: false
           prerelease: false
