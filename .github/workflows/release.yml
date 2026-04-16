@@ -52,19 +52,27 @@ jobs:
           cp build/darwin/Info.plist DelveUI.app/Contents/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.ref_name }}" DelveUI.app/Contents/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ github.ref_name }}" DelveUI.app/Contents/Info.plist
-          codesign --force --deep --sign "Developer ID Application: Patrick Waweru (Q79K8A6H7U)" --entitlements build/darwin/entitlements.plist DelveUI.app
+          # Try Developer ID signing; fall back to ad-hoc if cert unavailable
+          IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
+          if [ -n "$IDENTITY" ]; then
+            echo "Signing with: $IDENTITY"
+            codesign --force --deep --sign "$IDENTITY" --entitlements build/darwin/entitlements.plist --options runtime DelveUI.app
+          else
+            echo "No Developer ID found, using ad-hoc signing"
+            codesign --force --deep --sign - --entitlements build/darwin/entitlements.plist DelveUI.app
+          fi
       - name: Create zip + DMG with Applications shortcut
         run: |
           ditto -c -k --sequesterRsrc --keepParent DelveUI.app DelveUI-macOS-${{ github.ref_name }}.zip
 
-          # Create a staging folder with the app + Applications symlink
-          mkdir -p dmg-staging
-          cp -R DelveUI.app dmg-staging/
-          ln -s /Applications dmg-staging/Applications
-
-          # Create the DMG
-          hdiutil create -volname "DelveUI" -srcfolder dmg-staging -ov -format UDZO DelveUI-macOS-${{ github.ref_name }}.dmg
-          rm -rf dmg-staging
+          # Create a temporary writable DMG with app + Applications alias
+          hdiutil create -size 100m -volname "DelveUI" -fs HFS+ -ov /tmp/delveui-rw.dmg
+          hdiutil attach /tmp/delveui-rw.dmg -mountpoint /tmp/delveui-mount
+          cp -R DelveUI.app /tmp/delveui-mount/
+          ln -s /Applications /tmp/delveui-mount/Applications
+          hdiutil detach /tmp/delveui-mount
+          hdiutil convert /tmp/delveui-rw.dmg -format UDZO -o DelveUI-macOS-${{ github.ref_name }}.dmg
+          rm /tmp/delveui-rw.dmg
       - uses: actions/upload-artifact@v5
         with:
           name: macos
