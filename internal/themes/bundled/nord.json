@@ -1,0 +1,37 @@
+{
+  "name": "Nord",
+  "author": "Arctic Ice Studio",
+  "appearance": "dark",
+  "style": {
+    "bg": "#2e3440",
+    "bgElevated": "#3b4252",
+    "bgSubtle": "#272c36",
+    "surface": "#353c4a",
+    "text": "#d8dee9",
+    "textMuted": "#9aa5b6",
+    "textFaint": "#616e88",
+    "border": "#434c5e",
+    "borderSubtle": "#3b4252",
+    "accent": "#88c0d0",
+    "accentSubtle": "rgba(136,192,208,0.15)",
+    "danger": "#bf616a",
+    "warning": "#ebcb8b",
+    "success": "#a3be8c",
+    "info": "#81a1c1",
+    "synKeyword": "#81a1c1",
+    "synString": "#a3be8c",
+    "synNumber": "#b48ead",
+    "synFn": "#88c0d0",
+    "synComment": "#616e88",
+    "terminal": {
+      "black": "#3b4252", "red": "#bf616a", "green": "#a3be8c",
+      "yellow": "#ebcb8b", "blue": "#81a1c1", "magenta": "#b48ead",
+      "cyan": "#88c0d0", "white": "#e5e9f0",
+      "brightBlack": "#4c566a", "brightRed": "#bf616a",
+      "brightGreen": "#a3be8c", "brightYellow": "#ebcb8b",
+      "brightBlue": "#81a1c1", "brightMagenta": "#b48ead",
+      "brightCyan": "#8fbcbb", "brightWhite": "#eceff4",
+      "background": "#2e3440", "foreground": "#d8dee9", "cursor": "#d8dee9"
+    }
+  }
+}

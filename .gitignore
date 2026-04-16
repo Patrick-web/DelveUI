@@ -1,0 +1,25 @@
+# Build artifacts
+.task
+bin/
+frontend/dist/
+frontend/node_modules/
+build/linux/appimage/build/
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+
+# OS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Go
+__debug_bin*
+*.test
+
+# App data (local config, not source)
+*.local.json

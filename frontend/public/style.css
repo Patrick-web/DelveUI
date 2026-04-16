@@ -1,0 +1,11 @@
+/* Template defaults removed; DelveUI styles live in src/lib/theme.css */
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+body {
+  background: #1b1d22;
+  color-scheme: dark;
+}

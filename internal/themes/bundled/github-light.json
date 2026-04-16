@@ -1,0 +1,37 @@
+{
+  "name": "GitHub Light",
+  "author": "DelveUI",
+  "appearance": "light",
+  "style": {
+    "bg": "#ffffff",
+    "bgElevated": "#f6f8fa",
+    "bgSubtle": "#f0f2f5",
+    "surface": "#f6f8fa",
+    "text": "#24292f",
+    "textMuted": "#57606a",
+    "textFaint": "#8c959f",
+    "border": "#d0d7de",
+    "borderSubtle": "#e1e4e8",
+    "accent": "#0969da",
+    "accentSubtle": "rgba(9,105,218,0.1)",
+    "danger": "#cf222e",
+    "warning": "#9a6700",
+    "success": "#1a7f37",
+    "info": "#0969da",
+    "synKeyword": "#cf222e",
+    "synString": "#0a3069",
+    "synNumber": "#0550ae",
+    "synFn": "#8250df",
+    "synComment": "#8c959f",
+    "terminal": {
+      "black": "#24292f", "red": "#cf222e", "green": "#1a7f37",
+      "yellow": "#9a6700", "blue": "#0969da", "magenta": "#8250df",
+      "cyan": "#1b7c83", "white": "#f6f8fa",
+      "brightBlack": "#57606a", "brightRed": "#a40e26",
+      "brightGreen": "#2da44e", "brightYellow": "#bf8700",
+      "brightBlue": "#218bff", "brightMagenta": "#a475f9",
+      "brightCyan": "#3192aa", "brightWhite": "#ffffff",
+      "background": "#ffffff", "foreground": "#24292f", "cursor": "#044289"
+    }
+  }
+}

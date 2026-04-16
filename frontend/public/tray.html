@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DelveUI Sessions</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+    font-size: 12px;
+    background: rgba(27, 29, 34, 0.96);
+    color: #d4d7dd;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    border-radius: 10px;
+  }
+  .header {
+    display: flex; align-items: center; padding: 10px 12px 6px;
+    border-bottom: 1px solid #2b2e35;
+    gap: 6px;
+  }
+  .header h1 { font-size: 11px; font-weight: 600; color: #8a8f99; letter-spacing: 0.5px; text-transform: uppercase; flex: 1; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: transparent; border: 1px solid #2b2e35; color: #d4d7dd;
+    padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
+    font-family: inherit;
+  }
+  .btn:hover { background: #23262d; }
+  .btn.primary { background: #5b87d6; border-color: #5b87d6; color: #fff; }
+  .btn.primary:hover { background: #6c97e2; }
+  .btn.danger:hover { color: #e06c75; }
+
+  .sessions { flex: 1; overflow: auto; padding: 6px 0; }
+  .session {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; cursor: default;
+  }
+  .session:hover { background: #23262d; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot.running { background: #98c379; }
+  .dot.stopped { background: #e5c07b; }
+  .dot.starting { background: #61afef; }
+  .dot.exited, .dot.error { background: #e06c75; }
+  .dot.idle { background: #5a5f69; }
+  .info { flex: 1; min-width: 0; }
+  .name { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { font-size: 10px; color: #8a8f99; font-family: "IBM Plex Mono", monospace; }
+  .actions { display: flex; gap: 2px; }
+  .actions .btn { padding: 2px 6px; border: 0; font-size: 13px; min-width: 24px; justify-content: center; }
+
+  .empty { padding: 20px 12px; text-align: center; color: #5a5f69; }
+  .run-section { border-top: 1px solid #2b2e35; padding: 8px 12px; }
+  .run-section h2 { font-size: 10px; color: #5a5f69; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .cfg-btn {
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    background: transparent; border: 0; color: #d4d7dd;
+    padding: 5px 6px; border-radius: 4px; cursor: pointer;
+    font-size: 12px; font-family: inherit; text-align: left;
+  }
+  .cfg-btn:hover { background: #23262d; }
+  .play { color: #98c379; font-size: 11px; }
+
+  .footer {
+    display: flex; gap: 4px; padding: 6px 12px;
+    border-top: 1px solid #2b2e35; justify-content: flex-end;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>Sessions</h1>
+    <button class="btn" id="btn-show" title="Open main window">↗ Open</button>
+  </div>
+
+  <div class="sessions" id="sessions"></div>
+  <div class="run-section" id="run-section" style="display:none">
+    <h2>Launch</h2>
+    <div id="configs"></div>
+  </div>
+
+  <div class="footer">
+    <button class="btn danger" id="btn-stopall">Stop All</button>
+  </div>
+
+  <script type="module">
+    import { Call } from "/wails/runtime.js";
+    import { Events } from "/wails/runtime.js";
+
+    // We call bound methods by name since this page doesn't use the generated bindings
+    // SessionService methods use Call.ByName
+    async function callService(service, method, ...args) {
+      return Call.ByName(`github.com/jp/DelveUI/internal/services.${service}.${method}`, ...args);
+    }
+    async function callWS(method, ...args) {
+      return Call.ByName(`github.com/jp/DelveUI/internal/services.WorkspaceService.${method}`, ...args);
+    }
+
+    const sessionsEl = document.getElementById("sessions");
+    const configsEl = document.getElementById("configs");
+    const runSection = document.getElementById("run-section");
+
+    async function refresh() {
+      // sessions
+      let list = [];
+      try { list = await callService("SessionService", "List"); } catch {}
+      sessionsEl.innerHTML = "";
+      if (!list || list.length === 0) {
+        sessionsEl.innerHTML = '<div class="empty">No running sessions</div>';
+      } else {
+        for (const s of list) {
+          const div = document.createElement("div");
+          div.className = "session";
+          div.innerHTML = `
+            <span class="dot ${s.state}"></span>
+            <div class="info">
+              <div class="name">${esc(s.label)}</div>
+              <div class="meta">:${s.port} · PID ${s.pid} · ${s.state}</div>
+            </div>
+            <div class="actions">
+              <button class="btn" data-open="${s.id}" title="Open in main window">↗</button>
+              <button class="btn danger" data-stop="${s.id}" title="Stop">■</button>
+            </div>
+          `;
+          sessionsEl.appendChild(div);
+        }
+      }
+
+      // configs
+      let info = {};
+      try { info = await callWS("Info"); } catch {}
+      const cfgs = info.configs || [];
+      const runningCfgIds = new Set((list || []).map(s => s.cfgId));
+      const available = cfgs.filter(c => !runningCfgIds.has(c.id));
+      if (available.length > 0) {
+        runSection.style.display = "";
+        configsEl.innerHTML = "";
+        for (const cfg of available) {
+          const btn = document.createElement("button");
+          btn.className = "cfg-btn";
+          btn.innerHTML = `<span class="play">▶</span> ${esc(cfg.label)}`;
+          btn.onclick = () => startCfg(cfg.id);
+          configsEl.appendChild(btn);
+        }
+      } else {
+        runSection.style.display = "none";
+      }
+    }
+
+    async function startCfg(id) {
+      try { await callService("SessionService", "Start", id); } catch {}
+      refresh();
+    }
+
+    sessionsEl.addEventListener("click", async (e) => {
+      const stopBtn = e.target.closest("[data-stop]");
+      if (stopBtn) {
+        await callService("SessionService", "Stop", stopBtn.dataset.stop);
+        refresh();
+        return;
+      }
+      const openBtn = e.target.closest("[data-open]");
+      if (openBtn) {
+        // Focus main window & switch to this session
+        window.wails?.Window?.Show?.();
+        // Emit event so main app switches session
+        Events.Emit("tray:open-session", openBtn.dataset.open);
+      }
+    });
+
+    document.getElementById("btn-show").onclick = () => {
+      window.wails?.Window?.Show?.();
+    };
+    document.getElementById("btn-stopall").onclick = async () => {
+      const list = await callService("SessionService", "List");
+      for (const s of list || []) {
+        await callService("SessionService", "Stop", s.id);
+      }
+      refresh();
+    };
+
+    function esc(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // Refresh on events
+    Events.On("tray:sessions-changed", refresh);
+    Events.On("session:event", refresh);
+
+    // Initial load
+    refresh();
+  </script>
+</body>
+</html>

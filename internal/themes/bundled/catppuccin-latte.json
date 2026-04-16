@@ -1,0 +1,37 @@
+{
+  "name": "Catppuccin Latte",
+  "author": "Catppuccin",
+  "appearance": "light",
+  "style": {
+    "bg": "#eff1f5",
+    "bgElevated": "#e6e9ef",
+    "bgSubtle": "#dce0e8",
+    "surface": "#ccd0da",
+    "text": "#4c4f69",
+    "textMuted": "#6c6f85",
+    "textFaint": "#9ca0b0",
+    "border": "#bcc0cc",
+    "borderSubtle": "#ccd0da",
+    "accent": "#1e66f5",
+    "accentSubtle": "rgba(30,102,245,0.1)",
+    "danger": "#d20f39",
+    "warning": "#df8e1d",
+    "success": "#40a02b",
+    "info": "#1e66f5",
+    "synKeyword": "#8839ef",
+    "synString": "#40a02b",
+    "synNumber": "#fe640b",
+    "synFn": "#1e66f5",
+    "synComment": "#9ca0b0",
+    "terminal": {
+      "black": "#5c5f77", "red": "#d20f39", "green": "#40a02b",
+      "yellow": "#df8e1d", "blue": "#1e66f5", "magenta": "#8839ef",
+      "cyan": "#179299", "white": "#acb0be",
+      "brightBlack": "#6c6f85", "brightRed": "#d20f39",
+      "brightGreen": "#40a02b", "brightYellow": "#df8e1d",
+      "brightBlue": "#1e66f5", "brightMagenta": "#8839ef",
+      "brightCyan": "#179299", "brightWhite": "#bcc0cc",
+      "background": "#eff1f5", "foreground": "#4c4f69", "cursor": "#dc8a78"
+    }
+  }
+}

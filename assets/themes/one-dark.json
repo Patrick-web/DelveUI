@@ -1,0 +1,37 @@
+{
+  "name": "One Dark",
+  "author": "DelveUI",
+  "appearance": "dark",
+  "style": {
+    "bg": "#1b1d22",
+    "bgElevated": "#23262d",
+    "bgSubtle": "#15171b",
+    "surface": "#1f2127",
+    "text": "#d4d7dd",
+    "textMuted": "#8a8f99",
+    "textFaint": "#5a5f69",
+    "border": "#2b2e35",
+    "borderSubtle": "#22252b",
+    "accent": "#5b87d6",
+    "accentSubtle": "rgba(91,135,214,0.15)",
+    "danger": "#e06c75",
+    "warning": "#e5c07b",
+    "success": "#98c379",
+    "info": "#61afef",
+    "synKeyword": "#c678dd",
+    "synString": "#98c379",
+    "synNumber": "#d19a66",
+    "synFn": "#61afef",
+    "synComment": "#5a5f69",
+    "terminal": {
+      "black": "#282c34", "red": "#e06c75", "green": "#98c379",
+      "yellow": "#e5c07b", "blue": "#61afef", "magenta": "#c678dd",
+      "cyan": "#56b6c2", "white": "#abb2bf",
+      "brightBlack": "#5c6370", "brightRed": "#e06c75",
+      "brightGreen": "#98c379", "brightYellow": "#e5c07b",
+      "brightBlue": "#61afef", "brightMagenta": "#c678dd",
+      "brightCyan": "#56b6c2", "brightWhite": "#ffffff",
+      "background": "#1b1d22", "foreground": "#abb2bf", "cursor": "#528bff"
+    }
+  }
+}

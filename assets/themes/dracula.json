@@ -1,0 +1,37 @@
+{
+  "name": "Dracula",
+  "author": "Dracula Theme",
+  "appearance": "dark",
+  "style": {
+    "bg": "#282a36",
+    "bgElevated": "#343746",
+    "bgSubtle": "#21222c",
+    "surface": "#2e303e",
+    "text": "#f8f8f2",
+    "textMuted": "#bfbfbf",
+    "textFaint": "#6272a4",
+    "border": "#44475a",
+    "borderSubtle": "#383a4a",
+    "accent": "#bd93f9",
+    "accentSubtle": "rgba(189,147,249,0.15)",
+    "danger": "#ff5555",
+    "warning": "#f1fa8c",
+    "success": "#50fa7b",
+    "info": "#8be9fd",
+    "synKeyword": "#ff79c6",
+    "synString": "#f1fa8c",
+    "synNumber": "#bd93f9",
+    "synFn": "#50fa7b",
+    "synComment": "#6272a4",
+    "terminal": {
+      "black": "#21222c", "red": "#ff5555", "green": "#50fa7b",
+      "yellow": "#f1fa8c", "blue": "#bd93f9", "magenta": "#ff79c6",
+      "cyan": "#8be9fd", "white": "#f8f8f2",
+      "brightBlack": "#6272a4", "brightRed": "#ff6e6e",
+      "brightGreen": "#69ff94", "brightYellow": "#ffffa5",
+      "brightBlue": "#d6acff", "brightMagenta": "#ff92df",
+      "brightCyan": "#a4ffff", "brightWhite": "#ffffff",
+      "background": "#282a36", "foreground": "#f8f8f2", "cursor": "#f8f8f2"
+    }
+  }
+}
