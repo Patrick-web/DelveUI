@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><link rel="stylesheet" href="shared.css"><title>DelveUI - Command Palette</title></head><body>
+<div class="app" style="filter:brightness(0.7)">
+  <div class="titlebar">
+    <div class="tb-left"><span class="logo">DelveUI</span><button class="btn outlined">myproject/.zed ▾</button></div>
+    <div class="tb-center">
+      <button class="session-tab active"><span class="dot running"></span> Run Console</button>
+    </div>
+    <div class="tb-right"><button class="btn primary">▶ Run ▾</button></div>
+  </div>
+  <div class="workspace">
+    <div class="panel" style="width:30%"><div class="panel-tabs"><button class="panel-tab active">Variables</button></div><div class="panel-body"></div></div>
+    <div class="panel" style="flex:1"><div class="panel-tabs"><button class="panel-tab active">Terminal</button></div><div class="panel-body" style="background:var(--bg-subtle)"></div></div>
+  </div>
+  <div class="statusbar"><div class="left"><span class="dot running" style="width:6px;height:6px"></span> Run Console :52841</div><div class="mid"></div><div class="right">voyage · 0 bp · 1 running</div></div>
+</div>
+
+<div class="palette-backdrop"></div>
+<div class="palette">
+  <input class="palette-search" value="theme" placeholder="Type a command…">
+  <div style="padding:4px 0">
+    <button class="palette-item sel"><span>Appearance: Switch Theme…</span> <span class="palette-hint">⌘K ⌘T</span></button>
+  </div>
+  <div style="padding:4px 16px;font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-subtle)">Themes</div>
+  <div style="padding:4px 0">
+    <button class="palette-item"><span style="color:var(--accent);font-size:9px;margin-right:4px">●</span> One Dark <span class="palette-hint">dark</span></button>
+    <button class="palette-item"><span style="color:var(--text-faint);font-size:9px;margin-right:4px">●</span> One Light <span class="palette-hint">light</span></button>
+    <button class="palette-item"><span style="color:var(--text-faint);font-size:9px;margin-right:4px">●</span> GitHub Dark <span class="palette-hint">dark</span></button>
+    <button class="palette-item"><span style="color:var(--text-faint);font-size:9px;margin-right:4px">●</span> Catppuccin Mocha <span class="palette-hint">dark</span></button>
+    <button class="palette-item"><span style="color:var(--text-faint);font-size:9px;margin-right:4px">●</span> Dracula <span class="palette-hint">dark</span></button>
+    <button class="palette-item"><span style="color:var(--text-faint);font-size:9px;margin-right:4px">●</span> Nord <span class="palette-hint">dark</span></button>
+  </div>
+</div>
+</body></html>

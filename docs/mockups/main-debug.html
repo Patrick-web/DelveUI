@@ -1,0 +1,77 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><link rel="stylesheet" href="shared.css"><title>DelveUI - Debug Session</title></head><body>
+<div class="app">
+  <div class="titlebar">
+    <div class="tb-left">
+      <span class="logo">DelveUI</span>
+      <button class="btn outlined">myproject/.zed ▾</button>
+      <button class="btn icon" style="color:var(--text-muted)">⚙</button>
+    </div>
+    <div class="tb-center">
+      <button class="session-tab active"><span class="dot running"></span> Run Console</button>
+      <button class="session-tab"><span class="dot running"></span> Run bff</button>
+      <button class="session-tab"><span class="dot stopped"></span> Run iam</button>
+    </div>
+    <div class="tb-right">
+      <button class="btn primary">▶ Run ▾</button>
+      <button class="btn icon">▶</button>
+      <button class="btn icon">⏸</button>
+      <button class="btn icon">⤼</button>
+      <button class="btn icon">↓</button>
+      <button class="btn icon">↑</button>
+      <button class="btn icon" style="color:var(--danger)">■</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div class="panel" style="width:30%">
+      <div class="panel-tabs">
+        <button class="panel-tab active">Breakpoints</button>
+        <button class="panel-tab">Call Stack</button>
+        <button class="panel-tab">Threads</button>
+        <button class="panel-tab">Variables</button>
+      </div>
+      <div class="panel-header">VARIABLES</div>
+      <div class="panel-body">
+        <div class="scope-row">▾ Locals</div>
+        <div class="var-row" style="padding-left:26px"><span class="var-name">req</span> <span class="var-type">*http.Request</span> <span class="var-val">&Request{Method:"POST"...}</span></div>
+        <div class="var-row" style="padding-left:26px"><span class="var-name">w</span> <span class="var-type">http.ResponseWriter</span> <span class="var-val">&responseWriter{}</span></div>
+        <div class="var-row" style="padding-left:26px"><span class="var-name">ctx</span> <span class="var-type">context.Context</span> <span class="var-val">context.Background.WithCancel</span></div>
+        <div class="var-row" style="padding-left:26px"><span class="var-name">claims</span> <span class="var-type">*auth.Claims</span> <span class="var-val">&Claims{Email:"user@..."}</span></div>
+        <div class="var-row" style="padding-left:26px"><span class="var-name">err</span> <span class="var-type">error</span> <span class="var-val">nil</span></div>
+        <div class="var-row" style="padding-left:26px"><span class="var-name">products</span> <span class="var-type">[]Product</span> <span class="var-val">[]*Product (len: 24)</span></div>
+        <div class="var-row" style="padding-left:26px"><span class="var-name">total</span> <span class="var-type">int</span> <span class="var-val">142</span></div>
+        <div class="scope-row">▸ Arguments</div>
+        <div class="scope-row">▸ Statics</div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="panel-tabs">
+        <button class="panel-tab active">Terminal</button>
+        <button class="panel-tab">Debug Console</button>
+      </div>
+      <div class="panel-header" style="justify-content:space-between">TERMINAL <span style="color:var(--text-faint);font-weight:400;font-size:11px">847 lines</span></div>
+      <div class="panel-body" style="background:var(--bg-subtle);padding:6px 0">
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> ~/myproject/internal/services/services.go:<span class="ansi-cyan">672</span> *** Console v2 Interceptor</div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> services.go:<span class="ansi-cyan">677</span> Console v2 - Authorization headers present: <span class="ansi-green">true</span></div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> services.go:<span class="ansi-cyan">583</span> Console v2 - Auth header (truncated): eyJhbGci...</div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> services.go:<span class="ansi-cyan">590</span> → Forwarding request to backend service</div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> services.go:<span class="ansi-cyan">732</span> → forwardAuthHeaders START ★★★</div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> services.go:<span class="ansi-cyan">736</span> Auth header forwarded</div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> services.go:<span class="ansi-cyan">793</span> Found authorization header, extracting JWT token</div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> services.go:<span class="ansi-cyan">806</span> JWT claims parsed</div>
+        <div class="term-line"><span class="ansi-yellow">INFO</span>  services.go:<span class="ansi-cyan">84</span> <span class="ansi-green">✓</span> Console v2 forwarding user metadata. Email: <span class="ansi-cyan">user@example.com</span>, Policy: G1P|</div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> services.go:<span class="ansi-cyan">799</span> No Bearer prefix found, trying to use header as-is</div>
+        <div class="term-line"><span class="ansi-blue">DEBUG</span> server.go:<span class="ansi-cyan">358</span> POST /myproject.vp.products.v1.ProductsService/BatchGetProducts</div>
+        <div class="term-line"><span class="ansi-green">INFO</span>  2026/04/16 10:15:42 gRPC response: <span class="ansi-green">OK</span> (24 products, 3.2ms)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <div class="left"><span class="dot running" style="width:6px;height:6px"></span> <span style="color:var(--text)">Run Console</span> <span>:52841</span> <span style="font-family:var(--font-mono);font-size:9px;padding:0 4px;background:var(--bg-subtle);border:1px solid var(--border-subtle);border-radius:3px;color:var(--text-faint)">PID 48291</span></div>
+    <div class="mid"><span style="color:var(--warning)">services/handler.go:142</span></div>
+    <div class="right">myproject <span class="sep">·</span> 3 bp <span class="sep">·</span> 3 running <span class="sep">·</span> 89 MB <span class="sep">·</span> 24m</div>
+  </div>
+</div>
+</body></html>
