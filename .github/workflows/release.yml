@@ -12,11 +12,11 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
       - name: Install Wails v3 CLI
@@ -43,7 +43,7 @@ jobs:
         run: |
           ditto -c -k --sequesterRsrc --keepParent DelveUI.app DelveUI-macOS-${{ github.ref_name }}.zip
           hdiutil create -volname "DelveUI" -srcfolder DelveUI.app -ov -format UDZO DelveUI-macOS-${{ github.ref_name }}.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: macos
           path: |
@@ -53,11 +53,11 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
       - name: Install system deps
@@ -80,7 +80,7 @@ jobs:
           cp DelveUI DelveUI-linux/
           cp build/appicon.png DelveUI-linux/delveui.png
           tar czf DelveUI-linux-${{ github.ref_name }}.tar.gz DelveUI-linux
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: linux
           path: DelveUI-linux-*.tar.gz
@@ -88,11 +88,11 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
       - name: Install Wails v3 CLI
@@ -107,7 +107,7 @@ jobs:
         run: go build -tags production -trimpath -ldflags="-w -s -X main.version=${{ github.ref_name }}" -o DelveUI.exe .
       - name: Package
         run: Compress-Archive -Path DelveUI.exe -DestinationPath DelveUI-windows-${{ github.ref_name }}.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows
           path: DelveUI-windows-*.zip
@@ -116,7 +116,7 @@ jobs:
     needs: [build-macos, build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           merge-multiple: true
       - name: List artifacts
