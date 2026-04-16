@@ -23,3 +23,10 @@ __debug_bin*
 
 # App data (local config, not source)
 *.local.json
+
+# Platform build templates (not used)
+build/android/
+build/docker/
+build/ios/
+build/linux/
+build/windows/
