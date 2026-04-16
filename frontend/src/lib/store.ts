@@ -363,3 +363,26 @@ Events.On("switch-session", (ev: any) => {
   const sid = ev.data as string;
   if (sid) activeSessionId.set(sid);
 });
+
+Events.On("update:available", async (ev: any) => {
+  const info = ev.data as any;
+  if (!info?.available) return;
+  const { toasts, dismiss } = await import("./toast");
+  const id = Date.now();
+  toasts.update((list) => [
+    ...list,
+    {
+      id,
+      kind: "info" as const,
+      title: `Update available: v${info.latestVersion}`,
+      body: `You're on v${info.currentVersion}. A new version is ready.`,
+      action: {
+        label: "View release",
+        run: () => {
+          dismiss(id);
+          if (info.releaseUrl) window.open(info.releaseUrl, "_blank");
+        },
+      },
+    },
+  ]);
+});

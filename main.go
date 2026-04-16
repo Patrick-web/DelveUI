@@ -123,7 +123,7 @@ func main() {
 	}()
 
 	// Background update check 30s after launch
-	updater.BackgroundCheck(version, 30*time.Second)
+	updater.BackgroundCheck(app, version, 30*time.Second)
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

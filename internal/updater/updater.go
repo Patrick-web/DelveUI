@@ -9,6 +9,7 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 const repo = "Patrick-web/DelveUI"
@@ -87,8 +88,9 @@ func trimV(v string) string {
 	return v
 }
 
-// BackgroundCheck runs an update check after a delay and logs the result.
-func BackgroundCheck(version string, delay time.Duration) {
+// BackgroundCheck runs an update check after a delay. If a new version is found,
+// emits an "update:available" Wails event so the frontend can show a toast.
+func BackgroundCheck(app *application.App, version string, delay time.Duration) {
 	go func() {
 		time.Sleep(delay)
 		svc := NewService(version)
@@ -99,6 +101,9 @@ func BackgroundCheck(version string, delay time.Duration) {
 		}
 		if info.Available {
 			log.Printf("update available: %s → %s (%s)", info.CurrentVersion, info.LatestVersion, info.ReleaseURL)
+			if app != nil {
+				app.Event.Emit("update:available", info)
+			}
 		}
 	}()
 }
