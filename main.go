@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"log"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -13,8 +14,11 @@ import (
 	"github.com/jp/DelveUI/internal/settings"
 	"github.com/jp/DelveUI/internal/themes"
 	"github.com/jp/DelveUI/internal/tray"
+	"github.com/jp/DelveUI/internal/updater"
 	"github.com/jp/DelveUI/internal/workspace"
 )
+
+var version = "dev"
 
 //go:embed all:frontend/dist
 var assets embed.FS
@@ -44,6 +48,8 @@ func main() {
 	}
 	_ = dbgFiles.ReloadAll()
 
+	updateSvc := updater.NewService(version)
+
 	wsSvc := services.NewWorkspaceService(store)
 	sessSvc := services.NewSessionService(mgr, wsSvc)
 	fileSvc := services.NewFileService()
@@ -63,6 +69,7 @@ func main() {
 			application.NewService(themeSvc),
 			application.NewService(settingsSvc),
 			application.NewService(dbgFiles),
+			application.NewService(updateSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -110,6 +117,9 @@ func main() {
 			app.Event.Emit("session:event", ev)
 		}
 	}()
+
+	// Background update check 30s after launch
+	updater.BackgroundCheck(version, 30*time.Second)
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
