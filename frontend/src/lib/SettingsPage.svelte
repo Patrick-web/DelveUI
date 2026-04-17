@@ -39,11 +39,14 @@
   const allTabs: Tab[] = ["appearance", "terminal", "panels", "debugfiles", "general"];
   const tabIcons: Record<Tab, string> = {
     appearance: "solar:palette-bold",
-    terminal: "solar:terminal-bold",
+    terminal: "solar:monitor-bold",
     panels: "solar:widget-bold",
     debugfiles: "solar:document-bold",
     general: "solar:settings-bold",
   };
+
+  // Settings search
+  let searchQuery = "";
   const tabLabels: Record<Tab, string> = {
     appearance: "Appearance",
     terminal: "Terminal",
@@ -294,22 +297,27 @@
     </div>
 
     <div class="content" bind:this={contentEl} role="tabpanel" aria-label={tabLabels[tab]}>
-      <button class="close-btn btn icon" on:click={close} title="Close (Esc)">
-        <Icon icon="solar:close-circle-linear" size={16} />
-      </button>
+      <div class="content-header">
+        <div class="search-box">
+          <Icon icon="solar:magnifer-linear" size={13} color="var(--text-faint)" />
+          <input class="search-input" bind:value={searchQuery} placeholder="Search settings…" />
+        </div>
+        <button class="btn icon" on:click={close} title="Close (Esc)">
+          <Icon icon="solar:close-circle-linear" size={16} />
+        </button>
+      </div>
 
       {#if tab === "appearance"}
         <h2>Appearance</h2>
 
-        <div class="field">
-          <span class="field-label">Theme</span>
-          <div class="theme-actions">
-            <button class="btn outlined" on:click={installTheme}>
-              <Icon icon="solar:upload-minimalistic-bold" size={12} /> Install from file
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Theme</span>
+            <button class="btn outlined sm" on:click={installTheme}>
+              <Icon icon="solar:upload-minimalistic-bold" size={11} /> Install
             </button>
           </div>
-        </div>
-        <div class="theme-grid" role="listbox" aria-label="Theme list">
+          <div class="theme-grid" role="listbox" aria-label="Theme list">
           {#each $themeList as t}
             <button
               class="theme-card"
@@ -329,46 +337,49 @@
               <span class="tauthor">{t.author}</span>
             </button>
           {/each}
-        </div>
-
-        <div class="field">
-          <span class="field-label" id="lbl-uifont">UI Font Size</span>
-          <div class="row">
-            <input type="range" min="10" max="18" aria-labelledby="lbl-uifont" bind:value={settings.uiFontSize} on:input={() => updateSetting("uiFontSize", settings.uiFontSize)} />
-            <span class="val">{settings.uiFontSize}px</span>
           </div>
         </div>
-        <div class="field">
-          <span class="field-label" id="lbl-buffont">Buffer Font Size</span>
-          <div class="row">
-            <input type="range" min="10" max="22" aria-labelledby="lbl-buffont" bind:value={settings.bufferFontSize} on:input={() => updateSetting("bufferFontSize", settings.bufferFontSize)} />
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">Font Sizes</span></div>
+          <div class="card-row">
+            <span class="card-info"><span class="card-title">UI</span></span>
+            <input type="range" min="10" max="18" bind:value={settings.uiFontSize} on:input={() => updateSetting("uiFontSize", settings.uiFontSize)} />
+            <span class="val">{settings.uiFontSize}px</span>
+          </div>
+          <div class="card-row">
+            <span class="card-info"><span class="card-title">Editor</span></span>
+            <input type="range" min="10" max="22" bind:value={settings.bufferFontSize} on:input={() => updateSetting("bufferFontSize", settings.bufferFontSize)} />
             <span class="val">{settings.bufferFontSize}px</span>
           </div>
         </div>
-        <div class="field">
-          <span class="field-label">Line Height</span>
-          <div class="row" role="radiogroup" aria-label="Line height">
-            {#each ["compact", "standard", "comfortable"] as lh}
-              <button class="btn" role="radio" aria-checked={settings.lineHeight === lh} class:primary={settings.lineHeight === lh} on:click={() => updateSetting("lineHeight", lh)}>{lh}</button>
-            {/each}
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">Line Height</span></div>
+          <div class="card-row">
+            <div class="btn-group" role="radiogroup" aria-label="Line height">
+              {#each ["compact", "standard", "comfortable"] as lh}
+                <button class="seg" class:active={settings.lineHeight === lh} on:click={() => updateSetting("lineHeight", lh)}>{lh}</button>
+              {/each}
+            </div>
           </div>
         </div>
 
       {:else if tab === "terminal"}
         <h2>Terminal</h2>
-        <div class="field">
-          <span class="field-label" id="lbl-termfont">Terminal Font Size</span>
-          <div class="row">
-            <input type="range" min="9" max="20" aria-labelledby="lbl-termfont" bind:value={settings.termFontSize} on:input={() => updateSetting("termFontSize", settings.termFontSize)} />
+        <div class="card">
+          <div class="card-header"><span class="card-title">Font Size</span></div>
+          <div class="card-row">
+            <input type="range" min="9" max="20" bind:value={settings.termFontSize} on:input={() => updateSetting("termFontSize", settings.termFontSize)} />
             <span class="val">{settings.termFontSize}px</span>
           </div>
         </div>
-        <div class="field">
-          <span class="field-label">Terminal Theme</span>
-          <div class="row" role="radiogroup" aria-label="Terminal theme">
-            <button class="btn" role="radio" aria-checked={settings.terminalTheme === "follow"} class:primary={settings.terminalTheme === "follow"} on:click={() => updateSetting("terminalTheme", "follow")}>Follow editor</button>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Terminal Theme</span></div>
+          <div class="card-row" style="flex-wrap:wrap">
+            <button class="seg" class:active={settings.terminalTheme === "follow"} on:click={() => updateSetting("terminalTheme", "follow")}>Follow editor</button>
             {#each $themeList as t}
-              <button class="btn" role="radio" aria-checked={settings.terminalTheme === t.name} class:primary={settings.terminalTheme === t.name} on:click={() => updateSetting("terminalTheme", t.name)}>{t.name}</button>
+              <button class="seg" class:active={settings.terminalTheme === t.name} on:click={() => updateSetting("terminalTheme", t.name)}>{t.name}</button>
             {/each}
           </div>
         </div>
@@ -449,32 +460,40 @@
 
       {:else if tab === "general"}
         <h2>General</h2>
-        <div class="field">
-          <span class="field-label">Vim Mode</span>
-          <label class="toggle">
-            <input type="checkbox" bind:checked={settings.vimMode} on:input={() => updateSetting("vimMode", settings.vimMode)} />
-            <span>{settings.vimMode ? "Enabled" : "Disabled"}</span>
-          </label>
+        <div class="card">
+          <div class="card-row">
+            <div class="card-info">
+              <span class="card-title">Vim Mode</span>
+              <span class="card-desc">Use Vim keybindings in the source editor</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" checked={settings.vimMode} on:change={(e) => updateSetting("vimMode", e.currentTarget.checked)} />
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
-        <div class="field">
-          <span class="field-label">Keyboard Shortcuts</span>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Keyboard Shortcuts</span></div>
           <div class="shortcuts">
             <div><span class="key">⌘⇧P</span> Command Palette</div>
+            <div><span class="key">⌘O</span> Quick Open File</div>
             <div><span class="key">⌘K ⌘T</span> Theme Picker</div>
             <div><span class="key">⌘,</span> Settings</div>
-            <div><span class="key">↓ / ↑</span> Navigate sidebar</div>
-            <div><span class="key">→ / Enter</span> Focus content</div>
-            <div><span class="key">←</span> Back to sidebar</div>
+            <div><span class="key">⌘F</span> Search in Source</div>
+            <div><span class="key">Ctrl+`</span> Focus Terminal</div>
             <div><span class="key">F5</span> Continue</div>
+            <div><span class="key">⇧F5</span> Stop</div>
             <div><span class="key">F10</span> Step Over</div>
             <div><span class="key">F11</span> Step In</div>
             <div><span class="key">⇧F11</span> Step Out</div>
-            <div><span class="key">⇧F5</span> Stop</div>
           </div>
         </div>
-        <div class="field">
-          <span class="field-label">About</span>
-          <div class="about">DelveUI — Delve debugger GUI for Go</div>
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">About</span></div>
+          <div class="card-row">
+            <span class="about-text">DelveUI — Delve debugger GUI for Go</span>
+          </div>
         </div>
 
         <div class="field">
@@ -522,21 +541,47 @@
   .sidebar button.active { background:var(--accent-subtle); color:var(--text); }
   .tab-hint { margin-left:auto; font-family:var(--font-mono); font-size:9px; color:var(--text-faint); opacity:0.5; }
 
-  .content { flex:1; overflow:auto; padding:var(--space-4) var(--space-6); position:relative; }
-  .close-btn { position:absolute; top:var(--space-2); right:var(--space-2); }
-  h2 { font-size:var(--text-lg); font-weight:600; color:var(--text); margin:0 0 var(--space-4); }
+  .content { flex:1; overflow:auto; padding:var(--space-4) var(--space-5); }
+  .content-header { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-4); }
+  .search-box { flex:1; display:flex; align-items:center; gap:var(--space-2); background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:0 var(--space-2); height:28px; }
+  .search-input { flex:1; background:transparent; border:0; color:var(--text); font-family:var(--font-ui); font-size:var(--text-sm); outline:none; }
+
+  h2 { font-size:var(--text-lg); font-weight:600; color:var(--text); margin:0 0 var(--space-3); }
   h3 { font-size:var(--text-sm); font-weight:600; color:var(--text); margin:0 0 var(--space-2); }
   .desc { color:var(--text-muted); font-size:var(--text-sm); margin-bottom:var(--space-3); }
 
-  .field { margin-bottom:var(--space-4); }
-  .field-label { display:block; font-size:var(--text-xs); font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:var(--space-2); }
-  .row { display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap; }
-  .val { font-family:var(--font-mono); font-size:var(--text-sm); color:var(--text-faint); min-width:36px; }
-  input[type="range"] { flex:1; max-width:200px; accent-color:var(--accent); }
+  /* Card system */
+  .card { background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-md); margin-bottom:var(--space-3); overflow:hidden; }
+  .card-header { display:flex; align-items:center; justify-content:space-between; padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--border-subtle); }
+  .card-title { font-size:var(--text-sm); font-weight:600; color:var(--text); }
+  .card-desc { font-size:var(--text-xs); color:var(--text-faint); }
+  .card-row { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-3); }
+  .card-row + .card-row { border-top:1px solid var(--border-subtle); }
+  .card-info { flex:1; display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .sm { font-size:var(--text-xs); padding:3px 8px; height:auto; }
 
-  .theme-actions { margin-bottom:var(--space-2); }
-  .theme-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:var(--space-2); margin-bottom:var(--space-4); }
-  .theme-card { display:flex; flex-direction:column; gap:2px; padding:var(--space-2); background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); text-align:left; cursor:pointer; transition:border-color 80ms; outline:none; }
+  .val { font-family:var(--font-mono); font-size:var(--text-sm); color:var(--text-faint); min-width:36px; text-align:right; }
+  input[type="range"] { flex:1; max-width:200px; accent-color:var(--accent); height:4px; }
+
+  /* Segmented buttons */
+  .btn-group { display:flex; gap:0; }
+  .seg { background:var(--bg); border:1px solid var(--border); color:var(--text-muted); padding:4px 12px; font-size:var(--text-xs); font-family:var(--font-ui); cursor:pointer; transition:all 80ms; }
+  .seg:first-child { border-radius:var(--radius-sm) 0 0 var(--radius-sm); }
+  .seg:last-child { border-radius:0 var(--radius-sm) var(--radius-sm) 0; }
+  .seg:not(:first-child) { margin-left:-1px; }
+  .seg:hover { color:var(--text); background:var(--bg-elevated); }
+  .seg.active { background:var(--accent); color:#fff; border-color:var(--accent); z-index:1; }
+
+  /* Toggle switch */
+  .switch { position:relative; display:inline-block; width:36px; height:20px; flex-shrink:0; }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider { position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:10px; transition:0.2s; }
+  .slider:before { content:""; position:absolute; height:14px; width:14px; left:3px; bottom:3px; background:var(--text-faint); border-radius:50%; transition:0.2s; }
+  .switch input:checked + .slider { background:var(--accent); }
+  .switch input:checked + .slider:before { transform:translateX(16px); background:#fff; }
+
+  .theme-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:var(--space-2); padding:var(--space-2) var(--space-3); }
+  .theme-card { display:flex; flex-direction:column; gap:2px; padding:var(--space-2); background:var(--bg); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); text-align:left; cursor:pointer; transition:border-color 80ms; outline:none; }
   .theme-card:hover { border-color:var(--text-faint); }
   .theme-card:focus-visible { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-subtle); }
   .theme-card.active { border-color:var(--accent); background:var(--accent-subtle); }
@@ -549,6 +594,7 @@
 
   .toggle { display:flex; align-items:center; gap:var(--space-2); cursor:pointer; font-size:var(--text-sm); color:var(--text); }
   .toggle input { accent-color:var(--accent); }
+  .about-text { font-size:var(--text-sm); color:var(--text-muted); }
 
   .confirm-overlay {
     position:absolute; inset:0; background:rgba(0,0,0,0.5);
@@ -581,7 +627,7 @@
   .file-meta { font-size:var(--text-xs); color:var(--text-muted); }
   .empty { padding:var(--space-3); color:var(--text-faint); font-size:var(--text-sm); }
 
-  .shortcuts { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-1); font-size:var(--text-sm); color:var(--text-muted); }
-  .key { display:inline-block; padding:1px 6px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text); margin-right:var(--space-2); }
-  .about { font-size:var(--text-sm); color:var(--text-muted); }
+  .shortcuts { display:grid; grid-template-columns:1fr 1fr; gap:0; }
+  .shortcuts div { padding:var(--space-1) var(--space-3); font-size:var(--text-sm); color:var(--text-muted); border-bottom:1px solid var(--border-subtle); }
+  .key { display:inline-block; padding:1px 6px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text); margin-right:var(--space-2); min-width:48px; text-align:center; }
 </style>
