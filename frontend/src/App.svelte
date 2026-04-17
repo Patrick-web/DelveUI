@@ -92,9 +92,6 @@
         {$workspace?.debugFile ? $workspace.debugFile.split("/").slice(-3, -1).join("/") : "No project"}
         <Icon icon="solar:alt-arrow-down-linear" size={10} />
       </button>
-      <button class="btn icon tb-btn" title="Settings (⌘,)" on:click={() => (settingsOpen = true)}>
-        <Icon icon="solar:settings-bold" size={13} />
-      </button>
     </div>
 
     <!-- center: session tabs -->
@@ -175,8 +172,8 @@
   <!-- two-panel layout -->
   <div class="workspace">
     <Splitpanes on:resized={onResize}>
-      <Pane size={$layout.sizes.left} minSize={15}>
-        <Dock dock="left" />
+      <Pane size={$layout.sizes.left} minSize={3}>
+        <Dock dock="left" vertical onSettings={() => (settingsOpen = true)} />
       </Pane>
       <Pane size={$layout.sizes.right} minSize={20}>
         <Dock dock="right" />

@@ -4,6 +4,8 @@
   import Icon from "./Icon.svelte";
 
   export let dock: DockId;
+  export let vertical: boolean = false;
+  export let onSettings: (() => void) | undefined = undefined;
 
   let menuFor: string | null = null;
   let menuX = 0;
@@ -36,29 +38,65 @@
 
 <svelte:window on:click={closeMenu} />
 
-<div class="dock" data-dock={dock}>
-  <div class="tabbar">
-    {#each ids as id}
-      {@const p = panelById(id)}
-      {#if p}
-        <button
-          class="tab"
-          class:active={id === activeId}
-          on:click={() => onTabClick(id)}
-          on:contextmenu={(e) => onTabContext(e, id)}
-        >
-          <Icon icon={p.icon} size={12} />
-          <span>{p.title}</span>
-        </button>
+<div class="dock" class:vertical data-dock={dock}>
+  {#if vertical}
+    <!-- Vertical icon sidebar -->
+    <div class="v-sidebar">
+      <div class="v-tabs">
+        {#each ids as id}
+          {@const p = panelById(id)}
+          {#if p}
+            <button
+              class="v-tab"
+              class:active={id === activeId}
+              on:click={() => onTabClick(id)}
+              on:contextmenu={(e) => onTabContext(e, id)}
+              title={p.title}
+            >
+              <Icon icon={p.icon} size={16} />
+            </button>
+          {/if}
+        {/each}
+      </div>
+      {#if onSettings}
+        <div class="v-footer">
+          <button class="v-tab" on:click={onSettings} title="Settings (⌘,)">
+            <Icon icon="solar:settings-bold" size={16} />
+          </button>
+        </div>
       {/if}
-    {/each}
-  </div>
-
-  <div class="body">
-    {#if activePanel}
-      <svelte:component this={activePanel.component} />
-    {/if}
-  </div>
+    </div>
+    <div class="v-content">
+      <div class="body">
+        {#if activePanel}
+          <svelte:component this={activePanel.component} />
+        {/if}
+      </div>
+    </div>
+  {:else}
+    <!-- Horizontal tabs (default) -->
+    <div class="tabbar">
+      {#each ids as id}
+        {@const p = panelById(id)}
+        {#if p}
+          <button
+            class="tab"
+            class:active={id === activeId}
+            on:click={() => onTabClick(id)}
+            on:contextmenu={(e) => onTabContext(e, id)}
+          >
+            <Icon icon={p.icon} size={12} />
+            <span>{p.title}</span>
+          </button>
+        {/if}
+      {/each}
+    </div>
+    <div class="body">
+      {#if activePanel}
+        <svelte:component this={activePanel.component} />
+      {/if}
+    </div>
+  {/if}
 </div>
 
 {#if menuFor}
@@ -71,9 +109,8 @@
     on:click|stopPropagation
     on:keydown|stopPropagation
   >
-    <button on:click={() => moveTo("left")}>Move to Left Dock</button>
-    <button on:click={() => moveTo("right")}>Move to Right Dock</button>
-    <button on:click={() => moveTo("bottom")}>Move to Bottom Dock</button>
+    <button on:click={() => moveTo("left")}>Move to Left</button>
+    <button on:click={() => moveTo("right")}>Move to Right</button>
   </div>
 {/if}
 
@@ -86,6 +123,11 @@
     min-height: 0;
     background: var(--bg);
   }
+  .dock.vertical {
+    flex-direction: row;
+  }
+
+  /* Horizontal tabs */
   .tabbar {
     display: flex;
     align-items: center;
@@ -112,13 +154,55 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  .tab:hover {
-    color: var(--text);
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  /* Vertical icon sidebar */
+  .v-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 36px;
+    background: var(--bg-subtle);
+    border-right: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    align-items: center;
+    padding: var(--space-1) 0;
   }
-  .tab.active {
-    color: var(--text);
-    border-bottom-color: var(--accent);
+  .v-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
   }
+  .v-footer {
+    border-top: 1px solid var(--border-subtle);
+    padding-top: var(--space-1);
+  }
+  .v-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 0;
+    border-left: 2px solid transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    border-radius: 0;
+    transition: color 80ms;
+  }
+  .v-tab:hover { color: var(--text); background: var(--bg); }
+  .v-tab.active { color: var(--text); border-left-color: var(--accent); background: var(--bg); }
+
+  .v-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .body {
     flex: 1;
     overflow: hidden;
@@ -136,7 +220,7 @@
     padding: 4px;
     display: flex;
     flex-direction: column;
-    min-width: 180px;
+    min-width: 160px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
   .ctx button {
@@ -149,7 +233,5 @@
     font-size: var(--text-sm);
     cursor: pointer;
   }
-  .ctx button:hover {
-    background: var(--bg-subtle);
-  }
+  .ctx button:hover { background: var(--bg-subtle); }
 </style>
