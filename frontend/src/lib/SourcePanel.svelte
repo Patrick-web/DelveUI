@@ -4,7 +4,7 @@
   import { EditorState, StateField, StateEffect, RangeSet, Compartment } from "@codemirror/state";
   import { go } from "@codemirror/lang-go";
   import { oneDark } from "@codemirror/theme-one-dark";
-  import { vim } from "@replit/codemirror-vim";
+  import { vim, Vim } from "@replit/codemirror-vim";
   import { search, openSearchPanel, searchKeymap } from "@codemirror/search";
   import { defaultKeymap } from "@codemirror/commands";
   import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, scrollToLineRequest, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes } from "./store";
@@ -158,6 +158,16 @@
     return RangeSet.empty;
   });
 
+  // --- Vim commands ---
+  let vimCommandsRegistered = false;
+  function registerVimCommands() {
+    if (vimCommandsRegistered) return;
+    vimCommandsRegistered = true;
+    Vim.defineEx("write", "w", () => { saveFile(); });
+    Vim.defineEx("quit", "q", () => { /* no-op, can't close panel */ });
+    Vim.defineEx("wq", "wq", () => { saveFile(); });
+  }
+
   // --- Vim + Search ---
   const vimCompartment = new Compartment();
   $: vimEnabled = $appSettings.vimMode ?? false;
@@ -251,6 +261,8 @@
       parent: editorEl,
       state: EditorState.create({ doc: text, extensions }),
     });
+
+    registerVimCommands();
 
     // Apply initial breakpoints + current line
     updateDecorations(bpLines, currentLine);
