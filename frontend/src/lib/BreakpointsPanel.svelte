@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { sessionState, setBreakpoints, activeSessionId, activeSession, globalBreakpoints } from "./store";
+  import { sessionState, setBreakpoints, activeSessionId, activeSession, globalBreakpoints, manualSourcePath } from "./store";
+  import { setActivePanel } from "./panels/layout";
+
+  function goTo(path: string, line: number) {
+    manualSourcePath.set(path);
+    setActivePanel("right", "source");
+  }
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
   import * as SessionService from "../../bindings/github.com/jp/DelveUI/internal/services/sessionservice";
@@ -52,18 +58,18 @@
     <div class="empty">No breakpoints</div>
   {/if}
   {#each entries as bp}
-    <div class="bp" title="{bp.path}:{bp.line}">
+    <button class="bp" title="{bp.path}:{bp.line}" on:click={() => goTo(bp.path, bp.line)}>
       <Icon icon="solar:record-circle-bold" size={12} color="var(--danger)" />
       <span class="path">{shortPath(bp.path)}</span>
       <span class="line">:{bp.line}</span>
       <button
         class="btn icon x"
         title="Remove"
-        on:click={() => remove(bp.path, bp.line)}
+        on:click|stopPropagation={() => remove(bp.path, bp.line)}
       >
         <Icon icon="solar:close-circle-linear" size={13} />
       </button>
-    </div>
+    </button>
   {/each}
 </div>
 
@@ -84,6 +90,11 @@
     padding: var(--space-1) var(--space-3);
     font-size: var(--text-sm);
     font-family: var(--font-mono);
+    width: 100%;
+    background: transparent;
+    border: 0;
+    text-align: left;
+    cursor: pointer;
   }
   .bp:hover {
     background: var(--bg-subtle);
