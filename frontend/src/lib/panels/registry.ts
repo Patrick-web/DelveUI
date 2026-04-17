@@ -7,6 +7,7 @@ import CallStackPanel from "../CallStackPanel.svelte";
 import ThreadsPanel from "../ThreadsPanel.svelte";
 import ResourcesPanel from "../ResourcesPanel.svelte";
 import SourcePanel from "../SourcePanel.svelte";
+import WatchPanel from "../WatchPanel.svelte";
 
 export type DockId = "left" | "right";
 
@@ -67,6 +68,13 @@ export const PANELS: Panel[] = [
     icon: "solar:terminal-bold",
     defaultDock: "right",
     component: ConsolePanel as any,
+  },
+  {
+    id: "watch",
+    title: "Watch",
+    icon: "solar:eye-bold",
+    defaultDock: "left",
+    component: WatchPanel as any,
   },
   {
     id: "resources",

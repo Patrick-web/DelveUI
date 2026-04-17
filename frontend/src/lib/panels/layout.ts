@@ -10,7 +10,7 @@ type Layout = {
   visible: Record<DockId, boolean>;
 };
 
-const STORAGE_KEY = "delveui.layout.v4";
+const STORAGE_KEY = "delveui.layout.v5";
 
 function defaultLayout(): Layout {
   const assignments: Record<string, DockId> = {};

@@ -216,6 +216,15 @@
       onOpenSettings();
       return;
     }
+    // Ctrl+` → focus terminal
+    if (mod && e.key === "`") {
+      e.preventDefault();
+      import("./panels/layout").then(({ setActivePanel, setDockVisible }) => {
+        setDockVisible("right", true);
+        setActivePanel("right", "terminal");
+      });
+      return;
+    }
     if (mod && e.key.toLowerCase() === "k") {
       e.preventDefault();
       chordK = true;

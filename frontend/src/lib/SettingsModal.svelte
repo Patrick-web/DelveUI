@@ -9,6 +9,7 @@
   import { bracketMatching, indentOnInput, foldGutter, foldKeymap } from "@codemirror/language";
   import Icon from "./Icon.svelte";
   import { workspace, refreshWorkspace } from "./store";
+  import { appSettings } from "./settings-store";
   import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
   import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
 
@@ -17,7 +18,7 @@
   let container: HTMLDivElement;
   let view: EditorView | null = null;
   const vimCompartment = new Compartment();
-  let vimEnabled = false;
+  let vimEnabled = $appSettings.vimMode ?? false;
   let path = "";
   let dirty = false;
   let saving = false;
