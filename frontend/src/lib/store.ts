@@ -74,15 +74,8 @@ export const activeSession = derived(
   ([$s, $id]) => ($id ? $s[$id] : null),
 );
 
-// Shared frame selection — all panels read from this
+// Shared frame selection — selectedFrameId is set by CallStackPanel, read by Variables/Source/Console
 export const selectedFrameId = writable<number>(0);
-export const selectedFrame = derived(
-  [activeSessionId, sessionState, selectedFrameId],
-  ([$sid, $ss, $fid]) => {
-    const stack = $sid ? ($ss[$sid]?.stack ?? []) : [];
-    return stack.find((f) => f.id === $fid) ?? stack[0] ?? null;
-  },
-);
 
 // Per-session state
 type SessionState = {
@@ -93,6 +86,14 @@ type SessionState = {
 };
 
 export const sessionState = writable<Record<string, SessionState>>({});
+
+export const selectedFrame = derived(
+  [activeSessionId, sessionState, selectedFrameId],
+  ([$sid, $ss, $fid]) => {
+    const stack = $sid ? ($ss[$sid]?.stack ?? []) : [];
+    return stack.find((f) => f.id === $fid) ?? stack[0] ?? null;
+  },
+);
 
 function ensureSession(id: string) {
   sessionState.update((m) => {
