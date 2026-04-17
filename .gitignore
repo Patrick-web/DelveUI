@@ -24,6 +24,9 @@ __debug_bin*
 # App data (local config, not source)
 *.local.json
 
+# Wails-generated asset catalog (overrides custom icons)
+build/darwin/Assets.car
+
 # Platform build templates (not used)
 build/android/
 build/docker/
