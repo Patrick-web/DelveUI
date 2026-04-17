@@ -72,11 +72,15 @@ func (s *Service) applyDefaults() {
 		s.data.LineHeight = "standard"
 	}
 	if len(s.data.LeftPanels) == 0 {
-		s.data.LeftPanels = []string{"breakpoints", "callstack", "threads", "variables", "resources"}
+		s.data.LeftPanels = []string{"filetree", "breakpoints", "callstack", "threads", "variables", "watch", "resources"}
 	}
 	if len(s.data.RightPanels) == 0 {
-		s.data.RightPanels = []string{"terminal", "console"}
+		s.data.RightPanels = []string{"source", "terminal", "console"}
 	}
+	// Migrate: ensure new panels are present in existing configs
+	s.ensurePanel(&s.data.LeftPanels, "filetree")
+	s.ensurePanel(&s.data.LeftPanels, "watch")
+	s.ensurePanel(&s.data.RightPanels, "source")
 	if s.data.DefaultLeftTab == "" {
 		s.data.DefaultLeftTab = "breakpoints"
 	}
@@ -97,6 +101,15 @@ func (s *Service) Get() Settings {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.data
+}
+
+func (s *Service) ensurePanel(panels *[]string, id string) {
+	for _, p := range *panels {
+		if p == id {
+			return
+		}
+	}
+	*panels = append([]string{id}, *panels...)
 }
 
 func (s *Service) Update(next Settings) error {
