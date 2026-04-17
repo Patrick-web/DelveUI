@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeSessionId, sessionState, selectedFrame, selectedFrameId, setBreakpoints } from "./store";
+  import { activeSessionId, sessionState, selectedFrame, selectedFrameId, manualSourcePath, setBreakpoints } from "./store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
   import { readFile } from "./store";
@@ -7,8 +7,9 @@
   let text = "";
   let loadedPath = "";
 
-  $: path = $selectedFrame?.source?.path ?? "";
-  $: currentLine = $selectedFrame?.line ?? 0;
+  $: framePath = $selectedFrame?.source?.path ?? "";
+  $: path = $manualSourcePath || framePath;
+  $: currentLine = ($manualSourcePath && $manualSourcePath !== framePath) ? 0 : ($selectedFrame?.line ?? 0);
   $: breakpoints = $activeSessionId
     ? ($sessionState[$activeSessionId]?.breakpoints?.[path] ?? [])
     : [];

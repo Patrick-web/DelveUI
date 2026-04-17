@@ -24,6 +24,7 @@
   export let open = false;
   export let onOpenSettings: () => void = () => {};
   export let onOpenImport: () => void = () => {};
+  export let onOpenFile: () => void = () => {};
 
   type Mode = "commands" | "themes" | "run";
   let mode: Mode = "commands";
@@ -214,6 +215,12 @@
     if (mod && e.key === ",") {
       e.preventDefault();
       onOpenSettings();
+      return;
+    }
+    // Cmd+O → quick open file
+    if (mod && e.key.toLowerCase() === "o") {
+      e.preventDefault();
+      onOpenFile();
       return;
     }
     // Ctrl+` → focus terminal

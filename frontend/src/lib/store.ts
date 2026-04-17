@@ -77,6 +77,9 @@ export const activeSession = derived(
 // Shared frame selection — selectedFrameId is set by CallStackPanel, read by Variables/Source/Console
 export const selectedFrameId = writable<number>(0);
 
+// Manual source path — set by file tree / quick open, overridden by frame on stop
+export const manualSourcePath = writable<string>("");
+
 // Per-session state
 type SessionState = {
   output: { cat: string; text: string }[];
@@ -386,8 +389,9 @@ Events.On("session:event", async (ev: any) => {
       m[e.sessionId].stoppedThread = e.threadId ?? 0;
       return { ...m };
     });
-    // Reset frame selection to the stopped frame (will be stack[0] after fetchStack)
+    // Reset frame selection + clear manual source so frame takes over
     selectedFrameId.set(0);
+    manualSourcePath.set("");
     // Auto-switch to source panel when stopped
     import("./panels/layout").then(({ setActivePanel }) => {
       setActivePanel("right", "source");

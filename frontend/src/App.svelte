@@ -23,6 +23,7 @@
   import ImportWizard from "./lib/ImportWizard.svelte";
   import WelcomePage from "./lib/WelcomePage.svelte";
   import ConfigPicker from "./lib/ConfigPicker.svelte";
+  import QuickOpen from "./lib/QuickOpen.svelte";
   import Icon from "./lib/Icon.svelte";
   import { layout, setDockSize } from "./lib/panels/layout";
 
@@ -31,6 +32,7 @@
   let settingsOpen = false;
   let importWizardOpen = false;
   let configPickerOpen = false;
+  let quickOpenOpen = false;
   let showWelcome = false;
 
   onMount(async () => {
@@ -70,10 +72,12 @@
   bind:open={paletteOpen}
   onOpenSettings={() => (settingsOpen = true)}
   onOpenImport={() => (importWizardOpen = true)}
+  onOpenFile={() => (quickOpenOpen = true)}
 />
 <SettingsPage bind:open={settingsOpen} onOpenImport={() => (importWizardOpen = true)} />
 <ImportWizard bind:open={importWizardOpen} />
 <ConfigPicker bind:open={configPickerOpen} onOpenImport={() => (importWizardOpen = true)} />
+<QuickOpen bind:open={quickOpenOpen} />
 <WelcomePage visible={showWelcome} onDone={() => { showWelcome = false; refreshWorkspace(); }} />
 <Toast />
 

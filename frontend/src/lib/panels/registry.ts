@@ -1,4 +1,5 @@
 import type { SvelteComponent } from "svelte";
+import FileTreePanel from "../FileTreePanel.svelte";
 import BreakpointsPanel from "../BreakpointsPanel.svelte";
 import TerminalPanel from "../TerminalPanel.svelte";
 import ConsolePanel from "../ConsolePanel.svelte";
@@ -20,6 +21,13 @@ export type Panel = {
 };
 
 export const PANELS: Panel[] = [
+  {
+    id: "filetree",
+    title: "Files",
+    icon: "solar:folder-bold",
+    defaultDock: "left",
+    component: FileTreePanel as any,
+  },
   {
     id: "breakpoints",
     title: "Breakpoints",

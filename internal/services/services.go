@@ -479,6 +479,80 @@ type FileService struct{}
 
 func NewFileService() *FileService { return &FileService{} }
 
+type DirEntry struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	IsDir bool   `json:"isDir"`
+}
+
+var allowedExts = map[string]bool{
+	".go": true, ".json": true, ".yaml": true, ".yml": true, ".toml": true,
+	".mod": true, ".sum": true, ".md": true, ".txt": true, ".env": true,
+	".sh": true, ".bash": true, ".zsh": true, ".cfg": true, ".conf": true,
+	".proto": true, ".sql": true, ".graphql": true, ".html": true, ".css": true,
+}
+
+var hiddenDirs = map[string]bool{
+	".git": true, "node_modules": true, "vendor": true, "__pycache__": true,
+	".cache": true, ".idea": true, ".vscode": true, ".zed": true, ".delveui": true,
+	"dist": true, "build": true,
+}
+
+func (f *FileService) ListDir(dirPath string) ([]DirEntry, error) {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, err
+	}
+	var dirs, files []DirEntry
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasPrefix(name, ".") && !e.IsDir() {
+			continue
+		}
+		if e.IsDir() {
+			if hiddenDirs[name] {
+				continue
+			}
+			dirs = append(dirs, DirEntry{Name: name, Path: filepath.Join(dirPath, name), IsDir: true})
+		} else {
+			ext := filepath.Ext(name)
+			if allowedExts[ext] || ext == "" {
+				files = append(files, DirEntry{Name: name, Path: filepath.Join(dirPath, name), IsDir: false})
+			}
+		}
+	}
+	return append(dirs, files...), nil
+}
+
+func (f *FileService) ListGoFiles(root string) ([]string, error) {
+	var results []string
+	count := 0
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return filepath.SkipDir
+		}
+		if d.IsDir() {
+			if hiddenDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(d.Name()) == ".go" {
+			rel, _ := filepath.Rel(root, path)
+			results = append(results, rel)
+			count++
+			if count >= 5000 {
+				return filepath.SkipAll
+			}
+		}
+		return nil
+	})
+	if err != nil && err != filepath.SkipAll {
+		return results, err
+	}
+	return results, nil
+}
+
 func (f *FileService) ReadFile(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
