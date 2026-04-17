@@ -80,6 +80,9 @@ export const selectedFrameId = writable<number>(0);
 // Manual source path — set by file tree / quick open, overridden by frame on stop
 export const manualSourcePath = writable<string>("");
 
+// Scroll-to-line request — set when navigating to a breakpoint, consumed by SourcePanel
+export const scrollToLineRequest = writable<number>(0);
+
 // Per-session state
 type SessionState = {
   output: { cat: string; text: string }[];

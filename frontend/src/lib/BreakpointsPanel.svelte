@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { sessionState, setBreakpoints, activeSessionId, activeSession, globalBreakpoints, manualSourcePath } from "./store";
+  import { sessionState, setBreakpoints, activeSessionId, activeSession, globalBreakpoints, manualSourcePath, scrollToLineRequest } from "./store";
   import { setActivePanel } from "./panels/layout";
 
   function goTo(path: string, line: number) {
     manualSourcePath.set(path);
+    scrollToLineRequest.set(line);
     setActivePanel("right", "source");
   }
   import PanelHeader from "./PanelHeader.svelte";

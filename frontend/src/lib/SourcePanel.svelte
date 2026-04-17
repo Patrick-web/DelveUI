@@ -7,7 +7,7 @@
   import { vim } from "@replit/codemirror-vim";
   import { search, openSearchPanel, searchKeymap } from "@codemirror/search";
   import { defaultKeymap } from "@codemirror/commands";
-  import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes } from "./store";
+  import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, scrollToLineRequest, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes } from "./store";
   import { appSettings } from "./settings-store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
@@ -35,6 +35,12 @@
 
   // Scroll to current line when stopped
   $: if (view && currentLine > 0) scrollToLine(currentLine);
+
+  // Scroll to requested line (from breakpoints panel click)
+  $: if (view && $scrollToLineRequest > 0) {
+    scrollToLine($scrollToLineRequest);
+    scrollToLineRequest.set(0);
+  }
 
   async function loadFile(filePath: string) {
     try {
