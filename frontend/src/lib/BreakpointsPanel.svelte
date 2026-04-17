@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { sessionState, setBreakpoints, activeSessionId, activeSession } from "./store";
+  import { sessionState, setBreakpoints, activeSessionId, activeSession, globalBreakpoints } from "./store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
   import * as SessionService from "../../bindings/github.com/jp/DelveUI/internal/services/sessionservice";
@@ -14,9 +14,8 @@
     } catch (e) { console.error(e); }
   }
 
-  $: bps = $activeSessionId
-    ? ($sessionState[$activeSessionId]?.breakpoints ?? {})
-    : {};
+  // Read from globalBreakpoints (works with or without a session)
+  $: bps = $globalBreakpoints;
   $: entries = Object.entries(bps).flatMap(([path, lines]) =>
     (lines ?? []).map((line) => ({ path, line })),
   );
@@ -26,14 +25,12 @@
   }
 
   async function remove(path: string, line: number) {
-    if (!$activeSessionId) return;
     const current = bps[path] ?? [];
     const next = current.filter((l) => l !== line);
     await setBreakpoints($activeSessionId, path, next);
   }
 
   async function clearAll() {
-    if (!$activeSessionId) return;
     for (const p of Object.keys(bps)) {
       await setBreakpoints($activeSessionId, p, []);
     }

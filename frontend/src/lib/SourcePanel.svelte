@@ -20,12 +20,8 @@
   $: framePath = $selectedFrame?.source?.path ?? "";
   $: path = $manualSourcePath || framePath;
   $: currentLine = ($manualSourcePath && $manualSourcePath !== framePath) ? 0 : ($selectedFrame?.line ?? 0);
-  $: bpLines = (() => {
-    if ($activeSessionId && $sessionState[$activeSessionId]?.breakpoints?.[path]?.length) {
-      return $sessionState[$activeSessionId].breakpoints[path];
-    }
-    return $globalBreakpoints[path] ?? [];
-  })();
+  // Always read from global breakpoints (synced with session on start)
+  $: bpLines = $globalBreakpoints[path] ?? [];
 
   // Load file when path changes
   $: if (path && path !== loadedPath) {
@@ -34,7 +30,8 @@
   }
 
   // Update decorations when breakpoints or current line change
-  $: if (view) updateDecorations(bpLines, currentLine);
+  // Use bpLines and currentLine directly so Svelte tracks them as dependencies
+  $: bpLines, currentLine, view && updateDecorations(bpLines, currentLine);
 
   // Scroll to current line when stopped
   $: if (view && currentLine > 0) scrollToLine(currentLine);
