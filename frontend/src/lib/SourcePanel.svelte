@@ -1,9 +1,12 @@
 <script lang="ts">
   import { onDestroy, tick } from "svelte";
-  import { EditorView, gutter, GutterMarker, lineNumbers } from "@codemirror/view";
-  import { EditorState, StateField, StateEffect, RangeSet } from "@codemirror/state";
+  import { EditorView, gutter, GutterMarker, lineNumbers, highlightActiveLine, keymap } from "@codemirror/view";
+  import { EditorState, StateField, StateEffect, RangeSet, Compartment } from "@codemirror/state";
   import { go } from "@codemirror/lang-go";
   import { oneDark } from "@codemirror/theme-one-dark";
+  import { vim } from "@replit/codemirror-vim";
+  import { search, openSearchPanel, searchKeymap } from "@codemirror/search";
+  import { defaultKeymap } from "@codemirror/commands";
   import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes } from "./store";
   import { appSettings } from "./settings-store";
   import PanelHeader from "./PanelHeader.svelte";
@@ -114,6 +117,13 @@
     return RangeSet.empty;
   });
 
+  // --- Vim + Search ---
+  const vimCompartment = new Compartment();
+  $: vimEnabled = $appSettings.vimMode ?? false;
+  $: if (view) {
+    view.dispatch({ effects: vimCompartment.reconfigure(vimEnabled ? vim() : []) });
+  }
+
   // --- Editor creation ---
   function createEditor(text: string) {
     if (view) { view.destroy(); view = null; }
@@ -121,9 +131,13 @@
 
     const extensions = [
       EditorState.readOnly.of(true),
+      vimCompartment.of(vimEnabled ? vim() : []),
       go(),
       oneDark,
       lineNumbers(),
+      highlightActiveLine(),
+      search({ top: true }),
+      keymap.of([...defaultKeymap, ...searchKeymap]),
       breakpointGutter,
       breakpointState,
       EditorView.theme({
@@ -148,6 +162,27 @@
         "&.cm-focused": { outline: "none" },
         ".cm-line": { padding: "0 4px 0 0" },
         ".cm-scroller": { overflow: "auto" },
+        /* Search panel styling */
+        ".cm-search": {
+          background: "var(--bg-elevated)",
+          borderBottom: "1px solid var(--border)",
+          padding: "4px 8px",
+          fontSize: "12px",
+          fontFamily: "var(--font-mono)",
+        },
+        ".cm-search input, .cm-search button": {
+          background: "var(--bg-subtle)",
+          border: "1px solid var(--border)",
+          color: "var(--text)",
+          borderRadius: "3px",
+          padding: "2px 6px",
+          fontSize: "12px",
+          fontFamily: "var(--font-mono)",
+        },
+        ".cm-search button:hover": { background: "var(--bg)" },
+        ".cm-search label": { color: "var(--text-muted)", fontSize: "11px" },
+        ".cm-searchMatch": { backgroundColor: "rgba(255,204,0,0.25)", borderRadius: "2px" },
+        ".cm-searchMatch-selected": { backgroundColor: "rgba(255,204,0,0.5)" },
       }),
     ];
 
