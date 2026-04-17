@@ -37,10 +37,21 @@ jobs:
           security create-keychain -p "" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "" "$KEYCHAIN_PATH"
+
+          # Install Apple WWDR intermediate certificates (required for valid chain)
+          curl -sL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o /tmp/DevIDG2.cer
+          security import /tmp/DevIDG2.cer -k "$KEYCHAIN_PATH" -T /usr/bin/codesign || true
+          curl -sL https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer -o /tmp/WWDRG3.cer
+          security import /tmp/WWDRG3.cer -k "$KEYCHAIN_PATH" -T /usr/bin/codesign || true
+
           security import /tmp/certificate.p12 -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
-          rm /tmp/certificate.p12
+
+          # Verify
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+          rm /tmp/certificate.p12 /tmp/DevIDG2.cer /tmp/WWDRG3.cer
       - name: Build binary
         run: go build -tags production -trimpath -ldflags="-w -s -X main.version=${{ github.ref_name }}" -o DelveUI .
       - name: Create .app bundle and sign
