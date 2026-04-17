@@ -55,6 +55,8 @@
 
   --lh-comfortable: 1.618;
   --lh-standard: 1.3;
+
+  --text-term: 12px;
 }
 
 body {
@@ -191,6 +193,12 @@ input.tx:focus, .tx:focus {
 .ansi-italic { font-style: italic; }
 .ansi-underline { text-decoration: underline; }
 .ansi-strikethrough { text-decoration: line-through; }
+
+/* terminal output category colors */
+.cat-stderr { color: var(--danger); }
+.cat-dlv-stdout, .cat-dlv-stderr { opacity: 0.5; }
+.cat-console { color: var(--info); }
+.cat-important { color: var(--warning); }
 
 /* splitpanes dark theme override */
 .splitpanes.default-theme .splitpanes__pane { background: var(--bg); }

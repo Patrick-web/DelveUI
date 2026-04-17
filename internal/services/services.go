@@ -232,6 +232,24 @@ func (s *SessionService) Start(cfgID string) (StartResult, error) {
 
 func (s *SessionService) Stop(id string) error { return s.mgr.Stop(id) }
 
+func (s *SessionService) Restart(id string) (StartResult, error) {
+	sess := s.mgr.Get(id)
+	if sess == nil {
+		return StartResult{}, errors.New("session not found")
+	}
+	cfgID := sess.CfgID
+	_ = s.mgr.Stop(id)
+	return s.Start(cfgID)
+}
+
+func (s *SessionService) SetExceptionBreakpoints(id string, filters []string) error {
+	sess := s.liveSession(id)
+	if sess == nil {
+		return nil
+	}
+	return sess.Client().SetExceptionBreakpoints(filters)
+}
+
 func (s *SessionService) StopByCfg(cfgID string) error {
 	sess := s.mgr.FindByCfg(cfgID)
 	if sess == nil {

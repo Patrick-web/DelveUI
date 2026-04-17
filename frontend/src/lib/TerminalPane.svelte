@@ -13,7 +13,7 @@
 
   $: rendered = lines
     .filter((l) => filter(l.cat))
-    .map((l) => ansi.ansi_to_html(l.text))
+    .map((l) => `<span class="cat-${l.cat}">${ansi.ansi_to_html(l.text)}</span>`)
     .join("");
 
   afterUpdate(() => {
@@ -36,7 +36,7 @@
     overflow: auto;
     padding: var(--space-2) var(--space-3);
     font-family: var(--font-terminal);
-    font-size: var(--text-sm);
+    font-size: var(--text-term, var(--text-sm));
     line-height: var(--lh-standard);
     white-space: pre-wrap;
     background: var(--term-background);

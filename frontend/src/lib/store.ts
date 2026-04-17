@@ -74,6 +74,16 @@ export const activeSession = derived(
   ([$s, $id]) => ($id ? $s[$id] : null),
 );
 
+// Shared frame selection — all panels read from this
+export const selectedFrameId = writable<number>(0);
+export const selectedFrame = derived(
+  [activeSessionId, sessionState, selectedFrameId],
+  ([$sid, $ss, $fid]) => {
+    const stack = $sid ? ($ss[$sid]?.stack ?? []) : [];
+    return stack.find((f) => f.id === $fid) ?? stack[0] ?? null;
+  },
+);
+
 // Per-session state
 type SessionState = {
   output: { cat: string; text: string }[];
@@ -155,6 +165,10 @@ export async function startSession(cfgId: string) {
       sessions.update((m) => ({ ...m, [s.id]: s }));
       activeSessionId.set(s.id);
       ensureSession(s.id);
+      // Focus the terminal tab for the new session
+      import("./panels/layout").then(({ setActivePanel }) => {
+        setActivePanel("right", "terminal");
+      });
     }
     if (result.error) {
       const { showError } = await import("./toast");
@@ -166,6 +180,29 @@ export async function startSession(cfgId: string) {
     const { showError } = await import("./toast");
     showError("Failed to start session", msg);
     throw e;
+  }
+}
+
+export async function restartSession(id: string) {
+  try {
+    removeSession(id);
+    const result = (await SessionService.Restart(id)) as any;
+    const s = result.session as SessionInfo;
+    if (s?.id) {
+      sessions.update((m) => ({ ...m, [s.id]: s }));
+      activeSessionId.set(s.id);
+      ensureSession(s.id);
+      import("./panels/layout").then(({ setActivePanel }) => {
+        setActivePanel("right", "terminal");
+      });
+    }
+    if (result.error) {
+      const { showError } = await import("./toast");
+      showError("Restart failed", result.error);
+    }
+  } catch (e: any) {
+    const { showError } = await import("./toast");
+    showError("Restart failed", String(e?.message ?? e));
   }
 }
 
@@ -222,6 +259,8 @@ export async function fetchStack(sessionId: string) {
     m[sessionId].stack = frames;
     return { ...m };
   });
+  // Select top frame by default
+  if (frames.length > 0) selectedFrameId.set(frames[0].id);
   return frames;
 }
 
@@ -345,6 +384,12 @@ Events.On("session:event", async (ev: any) => {
       ensureSession(e.sessionId);
       m[e.sessionId].stoppedThread = e.threadId ?? 0;
       return { ...m };
+    });
+    // Reset frame selection to the stopped frame (will be stack[0] after fetchStack)
+    selectedFrameId.set(0);
+    // Auto-switch to source panel when stopped
+    import("./panels/layout").then(({ setActivePanel }) => {
+      setActivePanel("right", "source");
     });
     sessions.update((m) => {
       if (m[e.sessionId]) m[e.sessionId] = { ...m[e.sessionId], state: "stopped" };

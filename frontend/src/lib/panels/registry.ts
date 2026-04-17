@@ -6,6 +6,7 @@ import VariablesPanel from "../VariablesPanel.svelte";
 import CallStackPanel from "../CallStackPanel.svelte";
 import ThreadsPanel from "../ThreadsPanel.svelte";
 import ResourcesPanel from "../ResourcesPanel.svelte";
+import SourcePanel from "../SourcePanel.svelte";
 
 export type DockId = "left" | "right";
 
@@ -45,6 +46,13 @@ export const PANELS: Panel[] = [
     icon: "solar:database-bold",
     defaultDock: "left",
     component: VariablesPanel as any,
+  },
+  {
+    id: "source",
+    title: "Source",
+    icon: "solar:code-bold",
+    defaultDock: "right",
+    component: SourcePanel as any,
   },
   {
     id: "terminal",

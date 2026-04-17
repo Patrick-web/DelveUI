@@ -77,6 +77,40 @@ export async function loadTheme(name: string) {
   }
 }
 
+// Preview applies CSS vars without updating stores (for hover preview).
+export async function previewThemeByName(name: string) {
+  try {
+    const theme = (await ThemeService.Get(name)) as any as ThemeDefinition;
+    applyThemeCSS(theme);
+  } catch {}
+}
+
+// Apply only CSS vars, no store update.
+function applyThemeCSS(theme: ThemeDefinition) {
+  const root = document.documentElement;
+  const style = theme.style as any;
+  for (const [key, value] of Object.entries(style)) {
+    if (key === "terminal") continue;
+    root.style.setProperty("--" + camelToKebab(key), value as string);
+  }
+  if (style.terminal) {
+    for (const [key, value] of Object.entries(style.terminal as Record<string, string>)) {
+      root.style.setProperty("--term-" + camelToKebab(key), value);
+    }
+  }
+}
+
+// Revert preview by re-applying the saved theme from stores.
+export async function revertThemePreview() {
+  const saved = get(currentThemeName);
+  if (saved) {
+    try {
+      const theme = (await ThemeService.Get(saved)) as any as ThemeDefinition;
+      applyThemeCSS(theme);
+    } catch {}
+  }
+}
+
 export async function refreshThemeList() {
   try {
     const list = (await ThemeService.List()) as any as ThemeMeta[];

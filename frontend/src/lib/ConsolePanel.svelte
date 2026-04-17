@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeSession, activeSessionId, sessionState, evaluate } from "./store";
+  import { activeSession, activeSessionId, sessionState, selectedFrameId, evaluate } from "./store";
   import { showInfo } from "./toast";
   import TerminalPane from "./TerminalPane.svelte";
   import PanelHeader from "./PanelHeader.svelte";
@@ -13,10 +13,7 @@
   $: output = $activeSessionId
     ? ($sessionState[$activeSessionId]?.output ?? [])
     : [];
-  $: stack = $activeSessionId
-    ? ($sessionState[$activeSessionId]?.stack ?? [])
-    : [];
-  $: frameId = stack[0]?.id ?? 0;
+  $: frameId = $selectedFrameId;
 
   function isConsole(cat: string) {
     return (

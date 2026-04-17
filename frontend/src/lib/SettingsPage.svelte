@@ -22,6 +22,8 @@
     refreshThemeList,
     setTheme,
     loadTheme,
+    previewThemeByName,
+    revertThemePreview,
   } from "./theme-engine";
   import { pickDebugFile, refreshWorkspace, openDebugFile, workspace } from "./store";
   import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
@@ -51,18 +53,24 @@
   };
 
   let tab: Tab = "appearance";
-  let settings: AppSettings;
+  let settings: AppSettings = {
+    theme: "One Dark", terminalTheme: "follow", vimMode: false,
+    uiFontSize: 13, bufferFontSize: 13, termFontSize: 12, lineHeight: "standard",
+    dlvPath: "", leftPanels: [], rightPanels: [], defaultLeftTab: "", defaultRightTab: "",
+  };
   let previewTheme: string | null = null;
   let committed = false;
   let sidebarEl: HTMLElement;
   let contentEl: HTMLElement;
 
-  $: settings = { ...$appSettings };
+  // Don't reactively derive settings — it resets inputs mid-drag.
+  // Instead, load once on open.
   $: if (open) onOpen();
 
   async function onOpen() {
     await tick();
-    loadSettings();
+    await loadSettings();
+    settings = { ...$appSettings };
     loadDebugFiles();
     refreshThemeList();
     focusSidebar();
@@ -70,7 +78,7 @@
 
   function close() {
     if (previewTheme) {
-      loadTheme($currentThemeName);
+      revertThemePreview();
       previewTheme = null;
     }
     open = false;
@@ -138,12 +146,15 @@
   function previewT(name: string) {
     if (committed) return;
     previewTheme = name;
-    loadTheme(name);
+    previewThemeByName(name);
   }
 
   function revertPreview() {
     if (committed) return;
-    if (previewTheme) { loadTheme($currentThemeName); previewTheme = null; }
+    if (previewTheme) {
+      revertThemePreview();
+      previewTheme = null;
+    }
   }
 
   function themeKey(e: KeyboardEvent, name: string) {
@@ -158,6 +169,18 @@
     save();
     if (["leftPanels", "rightPanels", "defaultLeftTab", "defaultRightTab"].includes(key as string)) {
       applyPanelSettings();
+    }
+    applyFontSettings(settings);
+  }
+
+  function applyFontSettings(s: AppSettings) {
+    const root = document.documentElement;
+    if (s.uiFontSize) root.style.setProperty("--text-md", s.uiFontSize + "px");
+    if (s.bufferFontSize) root.style.setProperty("--text-sm", s.bufferFontSize + "px");
+    if (s.termFontSize) root.style.setProperty("--text-term", s.termFontSize + "px");
+    if (s.lineHeight) {
+      const lh = s.lineHeight === "compact" ? "1.2" : s.lineHeight === "comfortable" ? "1.618" : "1.3";
+      root.style.setProperty("--lh-standard", lh);
     }
   }
 
@@ -251,8 +274,9 @@
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <div class="backdrop" role="presentation" on:click={close}></div>
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div class="modal" role="dialog" aria-modal="true" aria-label="Settings" on:keydown={onModalKey}>
-    <nav class="sidebar" bind:this={sidebarEl} role="tablist" aria-label="Settings sections">
+    <div class="sidebar" bind:this={sidebarEl} role="tablist" aria-label="Settings sections">
       <div class="sidebar-title">Settings</div>
       {#each allTabs as t, i}
         <button
@@ -267,9 +291,9 @@
           <span class="tab-hint">⌘{i + 1}</span>
         </button>
       {/each}
-    </nav>
+    </div>
 
-    <section class="content" bind:this={contentEl} role="tabpanel" aria-label={tabLabels[tab]}>
+    <div class="content" bind:this={contentEl} role="tabpanel" aria-label={tabLabels[tab]}>
       <button class="close-btn btn icon" on:click={close} title="Close (Esc)">
         <Icon icon="solar:close-circle-linear" size={16} />
       </button>
@@ -310,14 +334,14 @@
         <div class="field">
           <span class="field-label" id="lbl-uifont">UI Font Size</span>
           <div class="row">
-            <input type="range" min="10" max="18" aria-labelledby="lbl-uifont" bind:value={settings.uiFontSize} on:change={() => updateSetting("uiFontSize", settings.uiFontSize)} />
+            <input type="range" min="10" max="18" aria-labelledby="lbl-uifont" bind:value={settings.uiFontSize} on:input={() => updateSetting("uiFontSize", settings.uiFontSize)} />
             <span class="val">{settings.uiFontSize}px</span>
           </div>
         </div>
         <div class="field">
           <span class="field-label" id="lbl-buffont">Buffer Font Size</span>
           <div class="row">
-            <input type="range" min="10" max="22" aria-labelledby="lbl-buffont" bind:value={settings.bufferFontSize} on:change={() => updateSetting("bufferFontSize", settings.bufferFontSize)} />
+            <input type="range" min="10" max="22" aria-labelledby="lbl-buffont" bind:value={settings.bufferFontSize} on:input={() => updateSetting("bufferFontSize", settings.bufferFontSize)} />
             <span class="val">{settings.bufferFontSize}px</span>
           </div>
         </div>
@@ -335,7 +359,7 @@
         <div class="field">
           <span class="field-label" id="lbl-termfont">Terminal Font Size</span>
           <div class="row">
-            <input type="range" min="9" max="20" aria-labelledby="lbl-termfont" bind:value={settings.termFontSize} on:change={() => updateSetting("termFontSize", settings.termFontSize)} />
+            <input type="range" min="9" max="20" aria-labelledby="lbl-termfont" bind:value={settings.termFontSize} on:input={() => updateSetting("termFontSize", settings.termFontSize)} />
             <span class="val">{settings.termFontSize}px</span>
           </div>
         </div>
@@ -404,7 +428,7 @@
         </div>
         <div class="file-list">
           {#each $debugFiles as f}
-            <div class="file-row" tabindex="0">
+            <div class="file-row" role="listitem">
               <button class="star" title={f.isDefault ? "Default" : "Set as default"} on:click={() => setDefaultDebugFile(f.id)}>
                 <Icon icon={f.isDefault ? "solar:star-bold" : "solar:star-linear"} size={14} color={f.isDefault ? "var(--warning)" : "var(--text-faint)"} />
               </button>
@@ -428,7 +452,7 @@
         <div class="field">
           <span class="field-label">Vim Mode</span>
           <label class="toggle">
-            <input type="checkbox" bind:checked={settings.vimMode} on:change={() => updateSetting("vimMode", settings.vimMode)} />
+            <input type="checkbox" bind:checked={settings.vimMode} on:input={() => updateSetting("vimMode", settings.vimMode)} />
             <span>{settings.vimMode ? "Enabled" : "Disabled"}</span>
           </label>
         </div>
@@ -469,7 +493,7 @@
           </div>
         </div>
       {/if}
-    </section>
+    </div>
 
     {#if confirmAction}
       <div class="confirm-overlay">
@@ -490,12 +514,12 @@
   .backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:800; }
   .modal { position:fixed; inset:40px; max-width:900px; margin:0 auto; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-md); display:flex; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.5); z-index:801; }
 
-  nav.sidebar { width:200px; background:var(--bg-subtle); border-right:1px solid var(--border); padding:var(--space-3); display:flex; flex-direction:column; gap:2px; flex-shrink:0; }
+  .sidebar { width:200px; background:var(--bg-subtle); border-right:1px solid var(--border); padding:var(--space-3); display:flex; flex-direction:column; gap:2px; flex-shrink:0; }
   .sidebar-title { font-size:var(--text-sm); font-weight:700; color:var(--text-muted); margin-bottom:var(--space-3); text-transform:uppercase; letter-spacing:0.5px; }
-  nav.sidebar button { display:flex; align-items:center; gap:var(--space-2); background:transparent; border:0; color:var(--text-muted); padding:var(--space-2); border-radius:var(--radius-sm); font-size:var(--text-sm); cursor:pointer; text-align:left; outline:none; }
-  nav.sidebar button:hover { background:var(--bg-elevated); color:var(--text); }
-  nav.sidebar button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; color:var(--text); }
-  nav.sidebar button.active { background:var(--accent-subtle); color:var(--text); }
+  .sidebar button { display:flex; align-items:center; gap:var(--space-2); background:transparent; border:0; color:var(--text-muted); padding:var(--space-2); border-radius:var(--radius-sm); font-size:var(--text-sm); cursor:pointer; text-align:left; outline:none; }
+  .sidebar button:hover { background:var(--bg-elevated); color:var(--text); }
+  .sidebar button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; color:var(--text); }
+  .sidebar button.active { background:var(--accent-subtle); color:var(--text); }
   .tab-hint { margin-left:auto; font-family:var(--font-mono); font-size:9px; color:var(--text-faint); opacity:0.5; }
 
   .content { flex:1; overflow:auto; padding:var(--space-4) var(--space-6); position:relative; }

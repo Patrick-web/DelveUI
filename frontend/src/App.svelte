@@ -12,6 +12,7 @@
     pickDebugFile,
     startSession,
     stopSession,
+    restartSession,
     control,
   } from "./lib/store";
   import Dock from "./lib/Dock.svelte";
@@ -155,6 +156,9 @@
           </button>
           <button class="btn icon tb-btn" title="Step Out" on:click={() => $activeSessionId && control("StepOut", $activeSessionId)}>
             <Icon icon="solar:arrow-up-bold" size={13} />
+          </button>
+          <button class="btn icon tb-btn" title="Restart" on:click={() => $activeSessionId && restartSession($activeSessionId)}>
+            <Icon icon="solar:restart-bold" size={13} />
           </button>
           <button class="btn icon tb-btn danger" title="Stop" on:click={() => $activeSessionId && stopSession($activeSessionId)}>
             <Icon icon="solar:stop-bold" size={13} />

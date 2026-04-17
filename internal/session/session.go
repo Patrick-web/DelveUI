@@ -171,6 +171,11 @@ func (s *Session) eventLoop() {
 			go func() {
 				_ = s.client.ConfigurationDone()
 			}()
+		case *godap.BreakpointEvent:
+			s.emit(Event{Kind: "breakpoint", Extra: map[string]any{
+				"reason":     ev.Body.Reason,
+				"breakpoint": ev.Body.Breakpoint,
+			}})
 		case *godap.TerminatedEvent:
 			s.setState(StateExited)
 		case *godap.ThreadEvent:

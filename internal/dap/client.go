@@ -312,6 +312,15 @@ func (c *Client) Evaluate(expr string, frameID int) (*dap.EvaluateResponse, erro
 	return resp.(*dap.EvaluateResponse), nil
 }
 
+func (c *Client) SetExceptionBreakpoints(filters []string) error {
+	req := &dap.SetExceptionBreakpointsRequest{
+		Request:   dap.Request{ProtocolMessage: dap.ProtocolMessage{Type: "request"}, Command: "setExceptionBreakpoints"},
+		Arguments: dap.SetExceptionBreakpointsArguments{Filters: filters},
+	}
+	_, err := c.Send(req)
+	return err
+}
+
 func (c *Client) Disconnect(terminate bool) error {
 	req := &dap.DisconnectRequest{
 		Request:   dap.Request{ProtocolMessage: dap.ProtocolMessage{Type: "request"}, Command: "disconnect"},

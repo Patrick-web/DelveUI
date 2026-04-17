@@ -267,6 +267,7 @@
     on:click={close}
     on:keydown={(e) => e.key === "Escape" && close()}
   ></div>
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div class="palette" role="dialog" aria-modal="true" on:click|stopPropagation on:keydown|stopPropagation>
     <div class="search-row">
       {#if mode !== "commands"}

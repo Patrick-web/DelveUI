@@ -55,7 +55,9 @@
 
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div class="backdrop" role="presentation" on:click={close}></div>
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div class="picker" role="dialog" aria-modal="true" on:keydown={onKey}>
     <div class="header">
       <Icon icon="solar:folder-open-bold" size={15} color="var(--accent)" />

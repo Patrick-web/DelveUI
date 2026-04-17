@@ -104,7 +104,9 @@
 
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div class="backdrop" role="presentation" on:click={close}></div>
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div class="wizard" role="dialog" aria-modal="true" on:keydown={(e) => e.key === "Escape" && close()}>
     <header>
       <Icon icon="solar:magnifer-bold" size={16} color="var(--accent)" />

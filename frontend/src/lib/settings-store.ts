@@ -45,8 +45,20 @@ export async function loadSettings() {
   try {
     const s = (await SettingsService.Get()) as any as AppSettings;
     appSettings.set(s);
+    applyFontSettingsGlobal(s);
   } catch (e) {
     console.error("Failed to load settings:", e);
+  }
+}
+
+function applyFontSettingsGlobal(s: AppSettings) {
+  const root = document.documentElement;
+  if (s.uiFontSize) root.style.setProperty("--text-md", s.uiFontSize + "px");
+  if (s.bufferFontSize) root.style.setProperty("--text-sm", s.bufferFontSize + "px");
+  if (s.termFontSize) root.style.setProperty("--text-term", s.termFontSize + "px");
+  if (s.lineHeight) {
+    const lh = s.lineHeight === "compact" ? "1.2" : s.lineHeight === "comfortable" ? "1.618" : "1.3";
+    root.style.setProperty("--lh-standard", lh);
   }
 }
 
