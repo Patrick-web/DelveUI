@@ -206,7 +206,7 @@
       }),
       highlightActiveLine(),
       search({ top: true }),
-      keymap.of([...defaultKeymap, ...searchKeymap]),
+      keymap.of(searchKeymap),
       breakpointGutter,
       breakpointState,
       currentLineField,
@@ -233,6 +233,10 @@
         "&.cm-focused": { outline: "none" },
         ".cm-line": { padding: "0 4px 0 0" },
         ".cm-scroller": { overflow: "auto" },
+        ".cm-selectionBackground": { backgroundColor: "rgba(91,135,214,0.3) !important" },
+        "&.cm-focused .cm-selectionBackground": { backgroundColor: "rgba(91,135,214,0.4) !important" },
+        ".cm-fat-cursor": { backgroundColor: "var(--accent) !important", color: "var(--bg) !important" },
+        ".cm-cursor": { borderLeftColor: "var(--accent)" },
         /* Search panel styling */
         ".cm-search": {
           background: "var(--bg-elevated)",
