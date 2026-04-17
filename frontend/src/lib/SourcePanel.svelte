@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, setBreakpoints, fetchVariables, fetchScopes } from "./store";
+  import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes } from "./store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
   import { readFile } from "./store";
@@ -10,9 +10,14 @@
   $: framePath = $selectedFrame?.source?.path ?? "";
   $: path = $manualSourcePath || framePath;
   $: currentLine = ($manualSourcePath && $manualSourcePath !== framePath) ? 0 : ($selectedFrame?.line ?? 0);
-  $: breakpoints = $activeSessionId
-    ? ($sessionState[$activeSessionId]?.breakpoints?.[path] ?? [])
-    : [];
+
+  // Read breakpoints from session state if session exists, otherwise from global store
+  $: breakpoints = (() => {
+    if ($activeSessionId && $sessionState[$activeSessionId]?.breakpoints?.[path]?.length) {
+      return $sessionState[$activeSessionId].breakpoints[path];
+    }
+    return $globalBreakpoints[path] ?? [];
+  })();
 
   // Inline variable values when stopped at current line
   let inlineVars: Record<number, string> = {};
@@ -30,7 +35,6 @@
       if (!locals) return;
       const vars = await fetchVariables($activeSessionId, locals.variablesReference);
       const map: Record<number, string> = {};
-      // Show inline values on the current stopped line
       if (currentLine) {
         const parts = vars.map((v) => `${v.name} = ${v.value}`).slice(0, 6);
         if (parts.length) map[currentLine] = parts.join("  ·  ");
@@ -49,8 +53,8 @@
 
   $: lines = text.split("\n");
 
-  function toggle(line: number) {
-    if (!$activeSessionId || !path) return;
+  function toggleBreakpoint(line: number) {
+    if (!path) return;
     const set = new Set(breakpoints);
     if (set.has(line)) set.delete(line);
     else set.add(line);
@@ -86,9 +90,35 @@
     hitInput = "";
   }
 
+  function addBreakpointFromCtx() {
+    toggleBreakpoint(ctxLine);
+    closeCtx();
+  }
+
+  function removeBreakpointFromCtx() {
+    if (!path) return;
+    const next = breakpoints.filter((l) => l !== ctxLine);
+    setBreakpoints($activeSessionId, path, next).catch(console.error);
+    closeCtx();
+  }
+
   function applyEdit() {
-    // For now, set the breakpoint (conditions require enhanced breakpoint data)
-    if (!breakpoints.includes(ctxLine)) toggle(ctxLine);
+    if (!path) { closeCtx(); return; }
+    // Ensure the breakpoint exists on this line
+    if (!breakpoints.includes(ctxLine)) {
+      const next = [...breakpoints, ctxLine].sort((a, b) => a - b);
+      setBreakpoints($activeSessionId, path, next).catch(console.error);
+    }
+    // TODO: When enhanced breakpoint store supports conditions, pass them here
+    // For now the breakpoint is set; condition/log/hit stored as UI feedback
+    const { showInfo } = (() => { try { return require("./toast"); } catch { return { showInfo: () => {} }; } })();
+    if (editingType === "condition" && conditionInput) {
+      console.log(`Condition breakpoint on line ${ctxLine}: ${conditionInput}`);
+    } else if (editingType === "log" && logInput) {
+      console.log(`Logpoint on line ${ctxLine}: ${logInput}`);
+    } else if (editingType === "hit" && hitInput) {
+      console.log(`Hit count breakpoint on line ${ctxLine}: ${hitInput}`);
+    }
     closeCtx();
   }
 
@@ -131,7 +161,7 @@
         <button
           class="gutter"
           class:bp={isBp}
-          on:click={() => toggle(n)}
+          on:click={() => toggleBreakpoint(n)}
           on:contextmenu={(e) => onGutterContext(e, n)}
           title="Click: toggle breakpoint · Right-click: options"
         >
@@ -155,9 +185,11 @@
 {#if ctxOpen}
   <div class="ctx" style:left="{ctxX}px" style:top="{ctxY}px" role="menu" tabindex="-1" on:click|stopPropagation on:keydown|stopPropagation>
     {#if !editingType}
-      <button on:click={() => { toggle(ctxLine); closeCtx(); }}>
-        {breakpoints.includes(ctxLine) ? "Remove Breakpoint" : "Add Breakpoint"}
-      </button>
+      {#if breakpoints.includes(ctxLine)}
+        <button on:click={removeBreakpointFromCtx}>Remove Breakpoint</button>
+      {:else}
+        <button on:click={addBreakpointFromCtx}>Add Breakpoint</button>
+      {/if}
       <button on:click={() => startEdit("condition")}>Add Condition…</button>
       <button on:click={() => startEdit("log")}>Add Log Message…</button>
       <button on:click={() => startEdit("hit")}>Hit Count…</button>
@@ -166,12 +198,14 @@
         <span class="edit-label">
           {editingType === "condition" ? "Condition:" : editingType === "log" ? "Log message:" : "Hit count:"}
         </span>
-        <!-- svelte-ignore a11y-autofocus -->
         {#if editingType === "condition"}
+          <!-- svelte-ignore a11y-autofocus -->
           <input class="edit-input" autofocus bind:value={conditionInput} placeholder="e.g. i > 10" on:keydown={(e) => { if (e.key === "Enter") applyEdit(); if (e.key === "Escape") closeCtx(); }} />
         {:else if editingType === "log"}
+          <!-- svelte-ignore a11y-autofocus -->
           <input class="edit-input" autofocus bind:value={logInput} placeholder='e.g. "value is x"' on:keydown={(e) => { if (e.key === "Enter") applyEdit(); if (e.key === "Escape") closeCtx(); }} />
         {:else}
+          <!-- svelte-ignore a11y-autofocus -->
           <input class="edit-input" autofocus bind:value={hitInput} placeholder="e.g. 5" on:keydown={(e) => { if (e.key === "Enter") applyEdit(); if (e.key === "Escape") closeCtx(); }} />
         {/if}
         <button class="btn primary" style="font-size:11px;padding:2px 8px" on:click={applyEdit}>Set</button>
@@ -196,7 +230,6 @@
     padding:0 var(--space-2); white-space:nowrap; overflow:hidden;
     text-overflow:ellipsis; opacity:0.7; font-style:italic;
   }
-
   .ctx {
     position:fixed; z-index:200; background:var(--bg-elevated);
     border:1px solid var(--border); border-radius:var(--radius-sm);

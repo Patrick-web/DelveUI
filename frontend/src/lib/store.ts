@@ -169,6 +169,8 @@ export async function startSession(cfgId: string) {
       sessions.update((m) => ({ ...m, [s.id]: s }));
       activeSessionId.set(s.id);
       ensureSession(s.id);
+      // Send any pre-set breakpoints to the new session
+      sendBreakpointsToSession(s.id).catch(() => {});
       // Focus the terminal tab for the new session
       import("./panels/layout").then(({ setActivePanel }) => {
         setActivePanel("right", "terminal");
@@ -240,17 +242,47 @@ export async function control(
   await (SessionService as any)[action](id);
 }
 
+// Global breakpoints store — persists independently of sessions
+export const globalBreakpoints = writable<Record<string, number[]>>({});
+
 export async function setBreakpoints(
-  sessionId: string,
+  sessionId: string | null,
   sourcePath: string,
   lines: number[],
 ) {
-  sessionState.update((m) => {
-    ensureSession(sessionId);
-    m[sessionId].breakpoints[sourcePath] = lines;
-    return { ...m };
-  });
-  return SessionService.SetBreakpoints(sessionId, sourcePath, lines);
+  // Always update global store
+  globalBreakpoints.update((m) => ({ ...m, [sourcePath]: lines }));
+
+  // Also update per-session state if session exists
+  if (sessionId) {
+    sessionState.update((m) => {
+      ensureSession(sessionId);
+      m[sessionId].breakpoints[sourcePath] = lines;
+      return { ...m };
+    });
+    try {
+      return await SessionService.SetBreakpoints(sessionId, sourcePath, lines);
+    } catch (e) {
+      console.error("SetBreakpoints failed:", e);
+    }
+  }
+}
+
+// Send all global breakpoints to a session (called on session start)
+export async function sendBreakpointsToSession(sessionId: string) {
+  const bps = get(globalBreakpoints);
+  for (const [sourcePath, lines] of Object.entries(bps)) {
+    if (lines.length > 0) {
+      try {
+        await SessionService.SetBreakpoints(sessionId, sourcePath, lines);
+        sessionState.update((m) => {
+          ensureSession(sessionId);
+          m[sessionId].breakpoints[sourcePath] = lines;
+          return { ...m };
+        });
+      } catch {}
+    }
+  }
 }
 
 export async function fetchStack(sessionId: string) {
