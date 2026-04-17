@@ -177,16 +177,17 @@ func NewSessionService(mgr *session.Manager, ws *WorkspaceService) *SessionServi
 }
 
 type SessionInfo struct {
-	ID    string        `json:"id"`
-	CfgID string        `json:"cfgId"`
-	Label string        `json:"label"`
-	State session.State `json:"state"`
-	Port  int           `json:"port"`
-	PID   int           `json:"pid"`
+	ID    string              `json:"id"`
+	CfgID string              `json:"cfgId"`
+	Label string              `json:"label"`
+	State session.State       `json:"state"`
+	Port  int                 `json:"port"`
+	PID   int                 `json:"pid"`
+	Cfg   config.LaunchConfig `json:"cfg"`
 }
 
 func toInfo(s *session.Session) SessionInfo {
-	return SessionInfo{ID: s.ID, CfgID: s.CfgID, Label: s.Label, State: s.State(), Port: s.Port, PID: s.PID}
+	return SessionInfo{ID: s.ID, CfgID: s.CfgID, Label: s.Label, State: s.State(), Port: s.Port, PID: s.PID, Cfg: s.Cfg}
 }
 
 func (s *SessionService) List() []SessionInfo {

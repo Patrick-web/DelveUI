@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { workspace } from "./store";
+  import { workspace, activeSession, sessions } from "./store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
   import FileTreeNode from "./FileTreeNode.svelte";
@@ -11,8 +11,30 @@
   let root: Entry[] = [];
   let rootPath = "";
 
-  $: newRoot = $workspace?.root ?? "";
-  $: if (newRoot && newRoot !== rootPath) { rootPath = newRoot; loadRoot(); }
+  // Derive the best project root:
+  // 1. Active session's cwd or program directory (the actual code being debugged)
+  // 2. First config's cwd or program directory
+  // 3. Fall back to workspace.root (debug.json location)
+  $: projectRoot = deriveRoot($activeSession, $workspace);
+  $: if (projectRoot && projectRoot !== rootPath) { rootPath = projectRoot; loadRoot(); }
+
+  function deriveRoot(session: any, ws: any): string {
+    // From active session's config
+    if (session?.cfg) {
+      const cfg = session.cfg;
+      if (cfg.cwd) return cfg.cwd.replace(/\/+$/, "");
+      if (cfg.program) return cfg.program.replace(/\/+$/, "");
+    }
+    // From first available config
+    const cfgs = ws?.configs ?? [];
+    if (cfgs.length > 0) {
+      const cfg = cfgs[0];
+      if (cfg.cwd) return cfg.cwd.replace(/\/+$/, "");
+      if (cfg.program) return cfg.program.replace(/\/+$/, "");
+    }
+    // Fall back to workspace root
+    return ws?.root ?? "";
+  }
 
   async function loadRoot() {
     if (!rootPath) return;

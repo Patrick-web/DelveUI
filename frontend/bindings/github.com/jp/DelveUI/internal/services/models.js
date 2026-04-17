@@ -179,6 +179,13 @@ export class SessionInfo {
              */
             this["pid"] = 0;
         }
+        if (!("cfg" in $$source)) {
+            /**
+             * @member
+             * @type {config$0.LaunchConfig}
+             */
+            this["cfg"] = (new config$0.LaunchConfig());
+        }
 
         Object.assign(this, $$source);
     }
@@ -189,7 +196,11 @@ export class SessionInfo {
      * @returns {SessionInfo}
      */
     static createFrom($$source = {}) {
+        const $$createField6_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("cfg" in $$parsedSource) {
+            $$parsedSource["cfg"] = $$createField6_0($$parsedSource["cfg"]);
+        }
         return new SessionInfo(/** @type {Partial<SessionInfo>} */($$parsedSource));
     }
 }
@@ -229,7 +240,7 @@ export class StartResult {
      * @returns {StartResult}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType0;
+        const $$createField0_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("session" in $$parsedSource) {
             $$parsedSource["session"] = $$createField0_0($$parsedSource["session"]);
@@ -310,8 +321,8 @@ export class WorkspaceInfo {
 }
 
 // Private type creation functions
-const $$createType0 = SessionInfo.createFrom;
-const $$createType1 = config$0.LaunchConfig.createFrom;
-const $$createType2 = $Create.Array($$createType1);
+const $$createType0 = config$0.LaunchConfig.createFrom;
+const $$createType1 = SessionInfo.createFrom;
+const $$createType2 = $Create.Array($$createType0);
 const $$createType3 = workspace$0.Recent.createFrom;
 const $$createType4 = $Create.Array($$createType3);
