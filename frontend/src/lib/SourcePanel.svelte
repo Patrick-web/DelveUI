@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, tick } from "svelte";
-  import { EditorView, gutter, GutterMarker, lineNumbers, highlightActiveLine, keymap } from "@codemirror/view";
+  import { EditorView, gutter, GutterMarker, lineNumbers, highlightActiveLine, keymap, Decoration, type DecorationSet } from "@codemirror/view";
   import { EditorState, StateField, StateEffect, RangeSet, Compartment } from "@codemirror/state";
   import { go } from "@codemirror/lang-go";
   import { oneDark } from "@codemirror/theme-one-dark";
@@ -70,6 +70,27 @@
   });
 
   const setAllBreakpoints = StateEffect.define<number[]>();
+
+  // Current stopped line highlight
+  const setCurrentLine = StateEffect.define<number>(); // pos or -1 to clear
+
+  const currentLineDecor = Decoration.line({ class: "cm-stopped-line" });
+
+  const currentLineField = StateField.define<DecorationSet>({
+    create() { return Decoration.none; },
+    update(set, tr) {
+      for (const e of tr.effects) {
+        if (e.is(setCurrentLine)) {
+          if (e.value >= 0) {
+            return Decoration.set([currentLineDecor.range(e.value)]);
+          }
+          return Decoration.none;
+        }
+      }
+      return set.map(tr.changes);
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  });
 
   class BreakpointMarker extends GutterMarker {
     toDOM() {
@@ -149,6 +170,7 @@
       keymap.of([...defaultKeymap, ...searchKeymap]),
       breakpointGutter,
       breakpointState,
+      currentLineField,
       EditorView.theme({
         "&": { height: "100%", fontSize: `${$appSettings.bufferFontSize ?? 13}px` },
         ".cm-content": { fontFamily: "var(--font-mono)", padding: "0" },
@@ -166,7 +188,8 @@
           justifyContent: "center",
           minWidth: "20px",
         },
-        ".cm-activeLine": { backgroundColor: "rgba(91,135,214,0.12)" },
+        ".cm-stopped-line": { backgroundColor: "rgba(229,192,123,0.15)", borderLeft: "2px solid var(--warning)" },
+        ".cm-activeLine": { backgroundColor: "rgba(91,135,214,0.08)" },
         ".cm-activeLineGutter": { backgroundColor: "rgba(91,135,214,0.08)" },
         "&.cm-focused": { outline: "none" },
         ".cm-line": { padding: "0 4px 0 0" },
@@ -209,11 +232,22 @@
     if (!view) return;
     const doc = view.state.doc;
 
+    const effects: StateEffect<any>[] = [];
+
     // Set breakpoints
     const positions = lines
       .filter((l) => l > 0 && l <= doc.lines)
       .map((l) => doc.line(l).from);
-    view.dispatch({ effects: setAllBreakpoints.of(positions) });
+    effects.push(setAllBreakpoints.of(positions));
+
+    // Set current stopped line
+    if (curLine > 0 && curLine <= doc.lines) {
+      effects.push(setCurrentLine.of(doc.line(curLine).from));
+    } else {
+      effects.push(setCurrentLine.of(-1));
+    }
+
+    view.dispatch({ effects });
   }
 
   function scrollToLine(line: number) {

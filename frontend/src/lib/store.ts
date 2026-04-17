@@ -424,9 +424,10 @@ Events.On("session:event", async (ev: any) => {
     // Reset frame selection + clear manual source so frame takes over
     selectedFrameId.set(0);
     manualSourcePath.set("");
-    // Auto-switch to source panel when stopped
+    // Auto-switch panels when stopped: source on right, variables on left
     import("./panels/layout").then(({ setActivePanel }) => {
       setActivePanel("right", "source");
+      setActivePanel("left", "variables");
     });
     sessions.update((m) => {
       if (m[e.sessionId]) m[e.sessionId] = { ...m[e.sessionId], state: "stopped" };
