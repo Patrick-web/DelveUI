@@ -143,6 +143,21 @@ func (c *Client) readLoop() {
 	}
 }
 
+// checkError returns an error if the DAP response is an ErrorResponse.
+func checkError(resp dap.Message) error {
+	if er, ok := resp.(*dap.ErrorResponse); ok {
+		detail := er.Message
+		if er.Body.Error != nil && er.Body.Error.Format != "" {
+			detail = er.Body.Error.Format
+			for k, v := range er.Body.Error.Variables {
+				detail = strings.ReplaceAll(detail, "{"+k+"}", v)
+			}
+		}
+		return fmt.Errorf("DAP error: %s", detail)
+	}
+	return nil
+}
+
 // Helpers wrap common requests with simpler APIs.
 
 func (c *Client) Initialize(clientID string) (*dap.InitializeResponse, error) {
@@ -154,7 +169,8 @@ func (c *Client) Initialize(clientID string) (*dap.InitializeResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*dap.InitializeResponse), nil
+	if err := checkError(resp); err != nil { return nil, err }
+	r, ok := resp.(*dap.InitializeResponse); if !ok { return nil, fmt.Errorf("unexpected response type") }; return r, nil
 }
 
 // Launch sends a raw launch with the given args map (Delve-specific keys like program/cwd/env).
@@ -205,7 +221,8 @@ func (c *Client) SetBreakpoints(source string, lines []int) (*dap.SetBreakpoints
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*dap.SetBreakpointsResponse), nil
+	if err := checkError(resp); err != nil { return nil, err }
+	r, ok := resp.(*dap.SetBreakpointsResponse); if !ok { return nil, fmt.Errorf("unexpected response type") }; return r, nil
 }
 
 func (c *Client) Continue(threadID int) error {
@@ -261,7 +278,8 @@ func (c *Client) Threads() (*dap.ThreadsResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*dap.ThreadsResponse), nil
+	if err := checkError(resp); err != nil { return nil, err }
+	r, ok := resp.(*dap.ThreadsResponse); if !ok { return nil, fmt.Errorf("unexpected response type") }; return r, nil
 }
 
 func (c *Client) StackTrace(threadID int) (*dap.StackTraceResponse, error) {
@@ -273,7 +291,8 @@ func (c *Client) StackTrace(threadID int) (*dap.StackTraceResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*dap.StackTraceResponse), nil
+	if err := checkError(resp); err != nil { return nil, err }
+	r, ok := resp.(*dap.StackTraceResponse); if !ok { return nil, fmt.Errorf("unexpected response type") }; return r, nil
 }
 
 func (c *Client) Scopes(frameID int) (*dap.ScopesResponse, error) {
@@ -285,7 +304,8 @@ func (c *Client) Scopes(frameID int) (*dap.ScopesResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*dap.ScopesResponse), nil
+	if err := checkError(resp); err != nil { return nil, err }
+	r, ok := resp.(*dap.ScopesResponse); if !ok { return nil, fmt.Errorf("unexpected response type") }; return r, nil
 }
 
 func (c *Client) Variables(ref int) (*dap.VariablesResponse, error) {
@@ -297,7 +317,8 @@ func (c *Client) Variables(ref int) (*dap.VariablesResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*dap.VariablesResponse), nil
+	if err := checkError(resp); err != nil { return nil, err }
+	r, ok := resp.(*dap.VariablesResponse); if !ok { return nil, fmt.Errorf("unexpected response type") }; return r, nil
 }
 
 func (c *Client) Evaluate(expr string, frameID int) (*dap.EvaluateResponse, error) {
@@ -309,7 +330,8 @@ func (c *Client) Evaluate(expr string, frameID int) (*dap.EvaluateResponse, erro
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*dap.EvaluateResponse), nil
+	if err := checkError(resp); err != nil { return nil, err }
+	r, ok := resp.(*dap.EvaluateResponse); if !ok { return nil, fmt.Errorf("unexpected response type") }; return r, nil
 }
 
 func (c *Client) SetExceptionBreakpoints(filters []string) error {
