@@ -28,6 +28,31 @@
   import { pickDebugFile, refreshWorkspace, openDebugFile, workspace } from "./store";
   import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
   import { showInfo, showError } from "./toast";
+  import * as UpdateService from "../../bindings/github.com/jp/DelveUI/internal/updater/service";
+
+  let updateInfo: any = null;
+  let checking = false;
+  let appInfo: any = null;
+
+  async function checkUpdates() {
+    checking = true;
+    updateInfo = null;
+    try {
+      const info = await UpdateService.CheckForUpdate() as any;
+      updateInfo = info;
+      if (!info?.available) {
+        showInfo("Up to date", `You're on the latest version (${info?.currentVersion ?? "?"})`);
+      }
+    } catch (e: any) {
+      showError("Update check failed", String(e?.message ?? e));
+    } finally {
+      checking = false;
+    }
+  }
+
+  async function loadAppInfo() {
+    try { appInfo = await UpdateService.AppInfo() as any; } catch {}
+  }
   import * as ThemeService from "../../bindings/github.com/jp/DelveUI/internal/themes/service";
   import * as SettingsServiceBinding from "../../bindings/github.com/jp/DelveUI/internal/settings/service";
   import * as DebugFilesStoreBinding from "../../bindings/github.com/jp/DelveUI/internal/debugfiles/store";
@@ -76,6 +101,7 @@
     settings = { ...$appSettings };
     loadDebugFiles();
     refreshThemeList();
+    loadAppInfo();
     focusSidebar();
   }
 
@@ -490,10 +516,43 @@
         </div>
 
         <div class="card">
+          <div class="card-header"><span class="card-title">Updates</span></div>
+          <div class="card-row">
+            <div class="card-info">
+              <span class="card-title">Current Version</span>
+              <span class="card-desc">{appInfo?.version ?? "loading…"}</span>
+            </div>
+            <button class="btn outlined sm" on:click={checkUpdates} disabled={checking}>
+              <Icon icon="solar:refresh-linear" size={11} />
+              {checking ? "Checking…" : "Check for Updates"}
+            </button>
+          </div>
+          {#if updateInfo?.available}
+            <div class="card-row update-available">
+              <Icon icon="solar:arrow-up-bold" size={14} color="var(--success)" />
+              <div class="card-info">
+                <span class="card-title" style="color:var(--success)">v{updateInfo.latestVersion} available</span>
+                {#if updateInfo.releaseNotes}
+                  <span class="card-desc">{updateInfo.releaseNotes.slice(0, 120)}{updateInfo.releaseNotes.length > 120 ? "…" : ""}</span>
+                {/if}
+              </div>
+              <a href={updateInfo.releaseUrl || "https://github.com/Patrick-web/DelveUI/releases/latest"} target="_blank" class="btn primary sm">
+                Download
+              </a>
+            </div>
+          {/if}
+        </div>
+
+        <div class="card">
           <div class="card-header"><span class="card-title">About</span></div>
           <div class="card-row">
             <span class="about-text">DelveUI — Delve debugger GUI for Go</span>
           </div>
+          {#if appInfo}
+            <div class="card-row">
+              <span class="card-desc">Go {appInfo.go} · {appInfo.os}/{appInfo.arch}</span>
+            </div>
+          {/if}
         </div>
 
         <div class="field">
@@ -595,6 +654,7 @@
   .toggle { display:flex; align-items:center; gap:var(--space-2); cursor:pointer; font-size:var(--text-sm); color:var(--text); }
   .toggle input { accent-color:var(--accent); }
   .about-text { font-size:var(--text-sm); color:var(--text-muted); }
+  .update-available { background:rgba(152,195,121,0.08); }
 
   .confirm-overlay {
     position:absolute; inset:0; background:rgba(0,0,0,0.5);
