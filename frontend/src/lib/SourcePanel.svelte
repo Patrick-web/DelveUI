@@ -1,68 +1,188 @@
 <script lang="ts">
+  import { onDestroy, tick } from "svelte";
+  import { EditorView, gutter, GutterMarker, lineNumbers } from "@codemirror/view";
+  import { EditorState, StateField, StateEffect, RangeSet } from "@codemirror/state";
+  import { go } from "@codemirror/lang-go";
+  import { oneDark } from "@codemirror/theme-one-dark";
   import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes } from "./store";
+  import { appSettings } from "./settings-store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
   import { readFile } from "./store";
 
-  let text = "";
+  let editorEl: HTMLDivElement;
+  let view: EditorView | null = null;
   let loadedPath = "";
 
   $: framePath = $selectedFrame?.source?.path ?? "";
   $: path = $manualSourcePath || framePath;
   $: currentLine = ($manualSourcePath && $manualSourcePath !== framePath) ? 0 : ($selectedFrame?.line ?? 0);
-
-  // Read breakpoints from session state if session exists, otherwise from global store
-  $: breakpoints = (() => {
+  $: bpLines = (() => {
     if ($activeSessionId && $sessionState[$activeSessionId]?.breakpoints?.[path]?.length) {
       return $sessionState[$activeSessionId].breakpoints[path];
     }
     return $globalBreakpoints[path] ?? [];
   })();
 
-  // Inline variable values when stopped at current line
-  let inlineVars: Record<number, string> = {};
-  $: if ($activeSession?.state === "stopped" && currentLine && $activeSessionId && $selectedFrameId) {
-    loadInlineVars();
-  } else {
-    inlineVars = {};
-  }
-
-  async function loadInlineVars() {
-    if (!$activeSessionId || !$selectedFrameId) return;
-    try {
-      const scopes = await fetchScopes($activeSessionId, $selectedFrameId) as any;
-      const locals = scopes?.scopes?.find((s: any) => s.name === "Locals");
-      if (!locals) return;
-      const vars = await fetchVariables($activeSessionId, locals.variablesReference);
-      const map: Record<number, string> = {};
-      if (currentLine) {
-        const parts = vars.map((v) => `${v.name} = ${v.value}`).slice(0, 6);
-        if (parts.length) map[currentLine] = parts.join("  ·  ");
-      }
-      inlineVars = map;
-    } catch { inlineVars = {}; }
-  }
-
+  // Load file when path changes
   $: if (path && path !== loadedPath) {
     loadedPath = path;
-    text = "";
-    readFile(path)
-      .then((t) => (text = t))
-      .catch((e) => (text = "// error: " + e));
+    loadFile(path);
   }
 
-  $: lines = text.split("\n");
+  // Update decorations when breakpoints or current line change
+  $: if (view) updateDecorations(bpLines, currentLine);
 
-  function toggleBreakpoint(line: number) {
-    if (!path) return;
-    const set = new Set(breakpoints);
-    if (set.has(line)) set.delete(line);
-    else set.add(line);
+  // Scroll to current line when stopped
+  $: if (view && currentLine > 0) scrollToLine(currentLine);
+
+  async function loadFile(filePath: string) {
+    try {
+      const text = await readFile(filePath);
+      await tick();
+      createEditor(text);
+    } catch (e) {
+      await tick();
+      createEditor("// Error loading file: " + e);
+    }
+  }
+
+  // --- Breakpoint gutter ---
+  const breakpointEffect = StateEffect.define<{ pos: number; on: boolean }>();
+
+  const breakpointState = StateField.define<RangeSet<GutterMarker>>({
+    create() { return RangeSet.empty; },
+    update(set, tr) {
+      set = set.map(tr.changes);
+      for (const e of tr.effects) {
+        if (e.is(breakpointEffect)) {
+          if (e.value.on) {
+            set = set.update({ add: [breakpointMarker.range(e.value.pos)] });
+          } else {
+            set = set.update({ filter: (from) => from !== e.value.pos });
+          }
+        } else if (e.is(setAllBreakpoints)) {
+          set = RangeSet.of(e.value.map((pos: number) => breakpointMarker.range(pos)));
+        }
+      }
+      return set;
+    },
+  });
+
+  const setAllBreakpoints = StateEffect.define<number[]>();
+
+  class BreakpointMarker extends GutterMarker {
+    toDOM() {
+      const el = document.createElement("span");
+      el.textContent = "●";
+      el.style.color = "var(--danger)";
+      el.style.fontSize = "14px";
+      el.style.lineHeight = "1";
+      return el;
+    }
+  }
+  const breakpointMarker = new BreakpointMarker();
+
+  const breakpointGutter = gutter({
+    class: "cm-breakpoint-gutter",
+    markers: (v) => v.state.field(breakpointState),
+    initialSpacer: () => breakpointMarker,
+    domEventHandlers: {
+      mousedown(view, line) {
+        toggleBreakpointAtLine(view, line.from);
+        return true;
+      },
+      contextmenu(view, line, event) {
+        const lineNo = view.state.doc.lineAt(line.from).number;
+        onGutterContext(event as MouseEvent, lineNo);
+        return true;
+      },
+    },
+  });
+
+  function toggleBreakpointAtLine(view: EditorView, pos: number) {
+    const lineNo = view.state.doc.lineAt(pos).number;
+    const set = new Set(bpLines);
+    if (set.has(lineNo)) set.delete(lineNo);
+    else set.add(lineNo);
     const next = [...set].sort((a, b) => a - b);
     setBreakpoints($activeSessionId, path, next).catch(console.error);
   }
 
-  // Right-click context menu
+  // --- Current line highlight ---
+  const currentLineDecoration = EditorView.decorations.compute(["doc"], () => {
+    return RangeSet.empty;
+  });
+
+  // --- Editor creation ---
+  function createEditor(text: string) {
+    if (view) { view.destroy(); view = null; }
+    if (!editorEl) return;
+
+    const extensions = [
+      EditorState.readOnly.of(true),
+      go(),
+      oneDark,
+      lineNumbers(),
+      breakpointGutter,
+      breakpointState,
+      EditorView.theme({
+        "&": { height: "100%", fontSize: `${$appSettings.bufferFontSize ?? 13}px` },
+        ".cm-content": { fontFamily: "var(--font-mono)", padding: "0" },
+        ".cm-gutters": {
+          backgroundColor: "var(--bg-subtle)",
+          borderRight: "1px solid var(--border-subtle)",
+          color: "var(--text-faint)",
+          minWidth: "44px",
+        },
+        ".cm-breakpoint-gutter .cm-gutterElement": {
+          padding: "0 2px",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minWidth: "20px",
+        },
+        ".cm-activeLine": { backgroundColor: "rgba(91,135,214,0.12)" },
+        ".cm-activeLineGutter": { backgroundColor: "rgba(91,135,214,0.08)" },
+        "&.cm-focused": { outline: "none" },
+        ".cm-line": { padding: "0 4px 0 0" },
+        ".cm-scroller": { overflow: "auto" },
+      }),
+    ];
+
+    view = new EditorView({
+      parent: editorEl,
+      state: EditorState.create({ doc: text, extensions }),
+    });
+
+    // Apply initial breakpoints + current line
+    updateDecorations(bpLines, currentLine);
+    if (currentLine > 0) scrollToLine(currentLine);
+  }
+
+  function updateDecorations(lines: number[], curLine: number) {
+    if (!view) return;
+    const doc = view.state.doc;
+
+    // Set breakpoints
+    const positions = lines
+      .filter((l) => l > 0 && l <= doc.lines)
+      .map((l) => doc.line(l).from);
+    view.dispatch({ effects: setAllBreakpoints.of(positions) });
+  }
+
+  function scrollToLine(line: number) {
+    if (!view) return;
+    const doc = view.state.doc;
+    if (line < 1 || line > doc.lines) return;
+    const pos = doc.line(line).from;
+    view.dispatch({
+      effects: EditorView.scrollIntoView(pos, { y: "center" }),
+    });
+  }
+
+  // --- Right-click context menu ---
   let ctxLine = 0;
   let ctxX = 0;
   let ctxY = 0;
@@ -85,39 +205,28 @@
 
   function startEdit(type: "condition" | "log" | "hit") {
     editingType = type;
-    conditionInput = "";
-    logInput = "";
-    hitInput = "";
+    conditionInput = ""; logInput = ""; hitInput = "";
   }
 
   function addBreakpointFromCtx() {
-    toggleBreakpoint(ctxLine);
+    if (!path) return;
+    const next = [...new Set([...bpLines, ctxLine])].sort((a, b) => a - b);
+    setBreakpoints($activeSessionId, path, next).catch(console.error);
     closeCtx();
   }
 
   function removeBreakpointFromCtx() {
     if (!path) return;
-    const next = breakpoints.filter((l) => l !== ctxLine);
+    const next = bpLines.filter((l) => l !== ctxLine);
     setBreakpoints($activeSessionId, path, next).catch(console.error);
     closeCtx();
   }
 
   function applyEdit() {
     if (!path) { closeCtx(); return; }
-    // Ensure the breakpoint exists on this line
-    if (!breakpoints.includes(ctxLine)) {
-      const next = [...breakpoints, ctxLine].sort((a, b) => a - b);
+    if (!bpLines.includes(ctxLine)) {
+      const next = [...bpLines, ctxLine].sort((a, b) => a - b);
       setBreakpoints($activeSessionId, path, next).catch(console.error);
-    }
-    // TODO: When enhanced breakpoint store supports conditions, pass them here
-    // For now the breakpoint is set; condition/log/hit stored as UI feedback
-    const { showInfo } = (() => { try { return require("./toast"); } catch { return { showInfo: () => {} }; } })();
-    if (editingType === "condition" && conditionInput) {
-      console.log(`Condition breakpoint on line ${ctxLine}: ${conditionInput}`);
-    } else if (editingType === "log" && logInput) {
-      console.log(`Logpoint on line ${ctxLine}: ${logInput}`);
-    } else if (editingType === "hit" && hitInput) {
-      console.log(`Hit count breakpoint on line ${ctxLine}: ${hitInput}`);
     }
     closeCtx();
   }
@@ -127,13 +236,26 @@
     return p.split("/").slice(-3).join("/");
   }
 
-  let container: HTMLDivElement;
-  $: if (currentLine && container) {
-    requestAnimationFrame(() => {
-      const lineEl = container?.querySelector(`[data-line="${currentLine}"]`);
-      lineEl?.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
+  // Inline variable values
+  let inlineVarText = "";
+  $: if ($activeSession?.state === "stopped" && currentLine && $activeSessionId && $selectedFrameId) {
+    loadInlineVars();
+  } else {
+    inlineVarText = "";
   }
+
+  async function loadInlineVars() {
+    if (!$activeSessionId || !$selectedFrameId) return;
+    try {
+      const scopes = await fetchScopes($activeSessionId, $selectedFrameId) as any;
+      const locals = scopes?.scopes?.find((s: any) => s.name === "Locals");
+      if (!locals) return;
+      const vars = await fetchVariables($activeSessionId, locals.variablesReference);
+      inlineVarText = vars.map((v) => `${v.name} = ${v.value}`).slice(0, 6).join("  ·  ");
+    } catch { inlineVarText = ""; }
+  }
+
+  onDestroy(() => { if (view) { view.destroy(); view = null; } });
 </script>
 
 <svelte:window on:click={() => ctxOpen && closeCtx()} />
@@ -144,48 +266,26 @@
   {/if}
 </PanelHeader>
 
-<div class="src" bind:this={container}>
-  {#if !text && !path}
+{#if inlineVarText}
+  <div class="inline-bar">{inlineVarText}</div>
+{/if}
+
+<div class="editor-wrap">
+  {#if !path}
     <div class="empty">
       <Icon icon="solar:code-2-bold-duotone" size={24} color="var(--text-faint)" />
       <span>Open a file from the Files panel or press <strong>⌘O</strong></span>
     </div>
-  {:else if !text && path}
-    <div class="empty">Loading {shortPath(path)}…</div>
   {:else}
-    {#each lines as line, i}
-      {@const n = i + 1}
-      {@const isBp = breakpoints.includes(n)}
-      {@const isCur = currentLine === n}
-      <div class="line" class:cur={isCur} data-line={n}>
-        <button
-          class="gutter"
-          class:bp={isBp}
-          on:click={() => toggleBreakpoint(n)}
-          on:contextmenu={(e) => onGutterContext(e, n)}
-          title="Click: toggle breakpoint · Right-click: options"
-        >
-          {#if isBp}
-            <Icon icon="solar:record-circle-bold" size={11} color="var(--danger)" />
-          {:else}
-            <span class="gutter-space"></span>
-          {/if}
-        </button>
-        <span class="lineno">{n}</span>
-        <span class="code">{line}</span>
-        {#if inlineVars[n]}
-          <span class="inline-vars">{inlineVars[n]}</span>
-        {/if}
-      </div>
-    {/each}
+    <div class="cm-container" bind:this={editorEl}></div>
   {/if}
 </div>
 
-<!-- Gutter context menu -->
+<!-- Context menu -->
 {#if ctxOpen}
   <div class="ctx" style:left="{ctxX}px" style:top="{ctxY}px" role="menu" tabindex="-1" on:click|stopPropagation on:keydown|stopPropagation>
     {#if !editingType}
-      {#if breakpoints.includes(ctxLine)}
+      {#if bpLines.includes(ctxLine)}
         <button on:click={removeBreakpointFromCtx}>Remove Breakpoint</button>
       {:else}
         <button on:click={addBreakpointFromCtx}>Add Breakpoint</button>
@@ -216,19 +316,14 @@
 
 <style>
   .path-hint { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .src { flex:1; overflow:auto; font-family:var(--font-mono); font-size:var(--text-sm); padding:var(--space-1) 0; background:var(--bg-subtle); }
-  .empty { display:flex; flex-direction:column; align-items:center; gap:var(--space-2); padding:var(--space-8) var(--space-4); color:var(--text-faint); font-size:var(--text-sm); text-align:center; font-family:var(--font-ui); }
-  .line { display:grid; grid-template-columns:22px 44px 1fr auto; align-items:stretch; min-height:20px; }
-  .line.cur { background:rgba(91,135,214,0.12); }
-  .gutter { background:transparent; border:0; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; min-width:22px; }
-  .gutter:hover:not(.bp) { background:rgba(224,108,117,0.1); }
-  .gutter-space { width:11px; height:11px; }
-  .lineno { color:var(--text-faint); text-align:right; padding-right:var(--space-2); user-select:none; font-size:var(--text-xs); line-height:20px; }
-  .code { white-space:pre; color:var(--text); line-height:20px; padding-right:var(--space-3); }
-  .inline-vars {
-    color:var(--text-faint); font-size:var(--text-xs); line-height:20px;
-    padding:0 var(--space-2); white-space:nowrap; overflow:hidden;
-    text-overflow:ellipsis; opacity:0.7; font-style:italic;
+  .editor-wrap { flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+  .cm-container { flex:1; overflow:hidden; }
+  .cm-container :global(.cm-editor) { height:100%; }
+  .empty { display:flex; flex-direction:column; align-items:center; gap:var(--space-2); padding:var(--space-8) var(--space-4); color:var(--text-faint); font-size:var(--text-sm); text-align:center; font-family:var(--font-ui); flex:1; justify-content:center; }
+  .inline-bar {
+    padding:2px var(--space-3); font-family:var(--font-mono); font-size:var(--text-xs);
+    color:var(--text-faint); background:var(--bg-elevated); border-bottom:1px solid var(--border-subtle);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-style:italic; flex-shrink:0;
   }
   .ctx {
     position:fixed; z-index:200; background:var(--bg-elevated);
