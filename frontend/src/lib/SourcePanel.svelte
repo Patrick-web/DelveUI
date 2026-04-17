@@ -134,7 +134,19 @@
       vimCompartment.of(vimEnabled ? vim() : []),
       go(),
       oneDark,
-      lineNumbers(),
+      lineNumbers({
+        domEventHandlers: {
+          mousedown(view, line) {
+            toggleBreakpointAtLine(view, line.from);
+            return true;
+          },
+          contextmenu(view, line, event) {
+            const lineNo = view.state.doc.lineAt(line.from).number;
+            onGutterContext(event as MouseEvent, lineNo);
+            return true;
+          },
+        },
+      }),
       highlightActiveLine(),
       search({ top: true }),
       keymap.of([...defaultKeymap, ...searchKeymap]),
