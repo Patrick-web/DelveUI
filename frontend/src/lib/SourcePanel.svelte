@@ -8,6 +8,8 @@
   import { search, openSearchPanel, searchKeymap } from "@codemirror/search";
   import { defaultKeymap } from "@codemirror/commands";
   import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, scrollToLineRequest, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes } from "./store";
+  import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
+  import { showInfo, showError } from "./toast";
   import { appSettings } from "./settings-store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
@@ -16,6 +18,7 @@
   let editorEl: HTMLDivElement;
   let view: EditorView | null = null;
   let loadedPath = "";
+  let dirty = false;
 
   $: framePath = $selectedFrame?.source?.path ?? "";
   $: path = $manualSourcePath || framePath;
@@ -47,9 +50,23 @@
       const text = await readFile(filePath);
       await tick();
       createEditor(text);
+      dirty = false;
     } catch (e) {
       await tick();
       createEditor("// Error loading file: " + e);
+      dirty = false;
+    }
+  }
+
+  async function saveFile() {
+    if (!view || !path || !dirty) return;
+    const content = view.state.doc.toString();
+    try {
+      await FileService.WriteFile(path, content);
+      dirty = false;
+      showInfo("Saved", shortPath(path));
+    } catch (e: any) {
+      showError("Save failed", String(e?.message ?? e));
     }
   }
 
@@ -154,10 +171,16 @@
     if (!editorEl) return;
 
     const extensions = [
-      EditorState.readOnly.of(true),
       vimCompartment.of(vimEnabled ? vim() : []),
       go(),
       oneDark,
+      keymap.of([{
+        key: "Mod-s",
+        run: () => { saveFile(); return true; },
+      }]),
+      EditorView.updateListener.of((u) => {
+        if (u.docChanged) dirty = true;
+      }),
       lineNumbers({
         domEventHandlers: {
           mousedown(view, line) {
@@ -347,6 +370,12 @@
 <PanelHeader title="Source">
   {#if path}
     <span class="path-hint">{shortPath(path)}</span>
+    {#if dirty}
+      <span class="dirty-dot" title="Unsaved changes">●</span>
+      <button class="btn icon" title="Save (⌘S)" on:click={saveFile}>
+        <Icon icon="solar:diskette-bold" size={12} />
+      </button>
+    {/if}
   {/if}
 </PanelHeader>
 
@@ -400,6 +429,7 @@
 
 <style>
   .path-hint { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dirty-dot { color:var(--warning); font-size:10px; }
   .editor-wrap { flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
   .cm-container { flex:1; overflow:hidden; }
   .cm-container :global(.cm-editor) { height:100%; }
