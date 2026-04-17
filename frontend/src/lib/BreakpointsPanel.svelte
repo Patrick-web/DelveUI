@@ -1,7 +1,18 @@
 <script lang="ts">
-  import { sessionState, setBreakpoints, activeSessionId } from "./store";
+  import { sessionState, setBreakpoints, activeSessionId, activeSession } from "./store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
+  import * as SessionService from "../../bindings/github.com/jp/DelveUI/internal/services/sessionservice";
+
+  let breakOnPanic = false;
+
+  async function togglePanic() {
+    breakOnPanic = !breakOnPanic;
+    if (!$activeSessionId) return;
+    try {
+      await SessionService.SetExceptionBreakpoints($activeSessionId, breakOnPanic ? ["panic"] : []);
+    } catch (e) { console.error(e); }
+  }
 
   $: bps = $activeSessionId
     ? ($sessionState[$activeSessionId]?.breakpoints ?? {})
@@ -30,6 +41,10 @@
 </script>
 
 <PanelHeader title="Breakpoints">
+  <label class="panic-toggle" title="Break on Go panic">
+    <input type="checkbox" checked={breakOnPanic} on:change={togglePanic} disabled={!$activeSessionId} />
+    <span>panic</span>
+  </label>
   <button class="btn icon" title="Remove All" on:click={clearAll}>
     <Icon icon="solar:trash-bin-minimalistic-linear" size={13} />
   </button>
@@ -89,7 +104,10 @@
   .x {
     color: var(--text-faint);
   }
-  .x:hover {
-    color: var(--danger);
+  .x:hover { color: var(--danger); }
+  .panic-toggle {
+    display:flex; align-items:center; gap:3px;
+    font-size:var(--text-xs); color:var(--text-muted); cursor:pointer;
   }
+  .panic-toggle input { accent-color:var(--danger); width:12px; height:12px; }
 </style>
