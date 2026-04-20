@@ -15,9 +15,8 @@
     control,
   } from "./lib/store";
   import Sidebar from "./lib/Sidebar.svelte";
+  import CenterPanel from "./lib/CenterPanel.svelte";
   import Inspector from "./lib/Inspector.svelte";
-  import BottomArea from "./lib/BottomArea.svelte";
-  import SourcePanel from "./lib/SourcePanel.svelte";
   import StatusBar from "./lib/StatusBar.svelte";
   import CommandPalette from "./lib/CommandPalette.svelte";
   import SettingsPage from "./lib/SettingsPage.svelte";
@@ -27,11 +26,7 @@
   import ConfigPicker from "./lib/ConfigPicker.svelte";
   import QuickOpen from "./lib/QuickOpen.svelte";
   import Icon from "./lib/Icon.svelte";
-  import {
-    layout,
-    setAreaSize,
-    toggleArea,
-  } from "./lib/panels/layout";
+  import { layout, setAreaSize, toggleArea } from "./lib/panels/layout";
 
   let cfgPickerOpen = false;
   let paletteOpen = false;
@@ -63,7 +58,6 @@
     const list = Object.values($sessions);
     if (list.length && !$activeSessionId) activeSessionId.set(list[0].id);
 
-    // Show welcome on first launch (no configs loaded)
     const { loadDebugFiles, debugFiles } = await import("./lib/settings-store");
     await loadDebugFiles();
     const { get } = await import("svelte/store");
@@ -90,12 +84,6 @@
       toggleArea("inspector");
       return;
     }
-    // Cmd+Shift+Y → toggle bottom
-    if (!e.altKey && e.shiftKey && e.key.toLowerCase() === "y") {
-      e.preventDefault();
-      toggleArea("bottom");
-      return;
-    }
   }
 
   $: sessionList = Object.values($sessions);
@@ -108,25 +96,17 @@
     await startSession(cfgId);
   }
 
-  function onOuterResize(e: CustomEvent<any>) {
+  function onResize(e: CustomEvent<any>) {
     const panes = e.detail;
     if (!panes) return;
-    // Three panes when sidebar + inspector visible; two when one is hidden; one if both hidden
-    if ($layout.visible.sidebar && $layout.visible.inspector && panes.length === 3) {
+    const vis = $layout.visible;
+    if (vis.sidebar && vis.inspector && panes.length === 3) {
       setAreaSize("sidebar", panes[0].size);
       setAreaSize("inspector", panes[2].size);
-    } else if ($layout.visible.sidebar && !$layout.visible.inspector && panes.length === 2) {
+    } else if (vis.sidebar && !vis.inspector && panes.length === 2) {
       setAreaSize("sidebar", panes[0].size);
-    } else if (!$layout.visible.sidebar && $layout.visible.inspector && panes.length === 2) {
+    } else if (!vis.sidebar && vis.inspector && panes.length === 2) {
       setAreaSize("inspector", panes[1].size);
-    }
-  }
-
-  function onCenterResize(e: CustomEvent<any>) {
-    const panes = e.detail;
-    if (!panes) return;
-    if ($layout.visible.bottom && panes.length === 2) {
-      setAreaSize("bottom", panes[1].size);
     }
   }
 </script>
@@ -147,13 +127,10 @@
 <main>
   <!-- Unified toolbar -->
   <div class="toolbar" data-wml-drag>
-    <!-- Traffic-light reservation zone -->
     <div class="tb-trafficlights" data-wml-no-drag></div>
 
-    <!-- Drag spacer (entire bar is draggable; interactive bits opt out) -->
     <div class="tb-drag-spacer"></div>
 
-    <!-- Right-side controls -->
     <div class="tb-right" data-wml-no-drag>
       {#if $activeSession}
         <div class="segmented step-controls">
@@ -206,28 +183,17 @@
     </div>
   </div>
 
-  <!-- 3-column layout: Sidebar | (Source / Bottom) | Inspector -->
+  <!-- 3-column horizontal layout. Center always fills full height. -->
   <div class="workspace">
-    <Splitpanes on:resized={onOuterResize}>
+    <Splitpanes on:resized={onResize}>
       {#if $layout.visible.sidebar}
-        <Pane size={$layout.sizes.sidebar} minSize={10} maxSize={35}>
+        <Pane size={$layout.sizes.sidebar} minSize={12} maxSize={35}>
           <Sidebar />
         </Pane>
       {/if}
 
       <Pane minSize={30}>
-        <Splitpanes horizontal on:resized={onCenterResize}>
-          <Pane minSize={20}>
-            <div class="main-pane">
-              <SourcePanel />
-            </div>
-          </Pane>
-          {#if $layout.visible.bottom}
-            <Pane size={$layout.sizes.bottom} minSize={8} maxSize={75}>
-              <BottomArea />
-            </Pane>
-          {/if}
-        </Splitpanes>
+        <CenterPanel />
       </Pane>
 
       {#if $layout.visible.inspector}
@@ -268,7 +234,6 @@
     box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03);
   }
 
-  /* Reserve space for traffic lights on macOS (they sit at x=20, 52 wide) */
   .tb-trafficlights {
     width: 78px;
     height: 100%;
@@ -278,19 +243,14 @@
     flex: 1;
     height: 100%;
   }
-
   .tb-right {
     display: flex;
     align-items: center;
     gap: 8px;
     -webkit-app-region: no-drag;
   }
-
   .step-controls { -webkit-app-region: no-drag; }
-  .step-controls .seg {
-    width: 28px;
-    padding: 0;
-  }
+  .step-controls .seg { width: 28px; padding: 0; }
 
   .run-picker { position: relative; }
   .dd {
@@ -328,22 +288,9 @@
     font-size: var(--text-sm);
   }
 
-  /* ---- Workspace ---- */
   .workspace {
     flex: 1;
     min-height: 0;
     overflow: hidden;
-  }
-  .main-pane {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    background: var(--bg);
-    overflow: hidden;
-  }
-  .main-pane :global(> *) {
-    flex: 1;
-    min-height: 0;
   }
 </style>

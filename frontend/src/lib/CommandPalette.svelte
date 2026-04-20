@@ -90,7 +90,6 @@
       },
       { id: "view.sidebar",   label: "View: Toggle Sidebar",   hint: "⌘0",   run: () => toggleArea("sidebar") },
       { id: "view.inspector", label: "View: Toggle Inspector", hint: "⌘⌥0",  run: () => toggleArea("inspector") },
-      { id: "view.bottom",    label: "View: Toggle Bottom Area", hint: "⌘⇧Y", run: () => toggleArea("bottom") },
     ];
     if ($activeSessionId) {
       const id = $activeSessionId;

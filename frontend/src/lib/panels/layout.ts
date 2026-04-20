@@ -1,46 +1,26 @@
-import { writable, get } from "svelte/store";
+import { writable } from "svelte/store";
 
-export type SidebarSectionId =
-  | "sessions"
-  | "filetree"
-  | "breakpoints"
-  | "callstack"
-  | "threads";
-
-export type InspectorId = "variables" | "watch" | "resources";
-export type BottomId = "terminal" | "console";
+export type SidebarTabId = "sessions" | "filetree" | "breakpoints";
+export type CenterTabId = "source" | "terminal" | "console";
+export type InspectorId = "variables" | "watch" | "callstack" | "threads" | "resources";
 
 export type Layout = {
-  sidebarSections: Record<SidebarSectionId, { expanded: boolean }>;
+  sidebarActive: SidebarTabId;
+  centerActive: CenterTabId;
   inspectorActive: InspectorId;
-  bottomActive: BottomId;
-  sizes: {
-    sidebar: number;   // %
-    inspector: number; // %
-    bottom: number;    // % of center column
-  };
-  visible: {
-    sidebar: boolean;
-    inspector: boolean;
-    bottom: boolean;
-  };
+  sizes: { sidebar: number; inspector: number };
+  visible: { sidebar: boolean; inspector: boolean };
 };
 
-const STORAGE_KEY = "delveui.layout.v7";
+const STORAGE_KEY = "delveui.layout.v8";
 
 function defaultLayout(): Layout {
   return {
-    sidebarSections: {
-      sessions:    { expanded: true },
-      filetree:    { expanded: true },
-      breakpoints: { expanded: false },
-      callstack:   { expanded: false },
-      threads:     { expanded: false },
-    },
+    sidebarActive: "sessions",
+    centerActive: "source",
     inspectorActive: "variables",
-    bottomActive: "terminal",
-    sizes: { sidebar: 18, inspector: 22, bottom: 30 },
-    visible: { sidebar: true, inspector: true, bottom: true },
+    sizes: { sidebar: 18, inspector: 22 },
+    visible: { sidebar: true, inspector: true },
   };
 }
 
@@ -53,7 +33,6 @@ function load(): Layout {
     return {
       ...def,
       ...parsed,
-      sidebarSections: { ...def.sidebarSections, ...(parsed.sidebarSections ?? {}) },
       sizes: { ...def.sizes, ...(parsed.sizes ?? {}) },
       visible: { ...def.visible, ...(parsed.visible ?? {}) },
     };
@@ -70,38 +49,23 @@ layout.subscribe((l) => {
   } catch {}
 });
 
-// ---- section expand/collapse ----
+// ---- active tabs ----
 
-export function toggleSection(id: SidebarSectionId) {
-  layout.update((l) => ({
-    ...l,
-    sidebarSections: {
-      ...l.sidebarSections,
-      [id]: { expanded: !l.sidebarSections[id]?.expanded },
-    },
-  }));
+export function setSidebarActive(id: SidebarTabId) {
+  layout.update((l) => ({ ...l, sidebarActive: id }));
 }
 
-export function setSectionExpanded(id: SidebarSectionId, expanded: boolean) {
-  layout.update((l) => ({
-    ...l,
-    sidebarSections: { ...l.sidebarSections, [id]: { expanded } },
-  }));
+export function setCenterActive(id: CenterTabId) {
+  layout.update((l) => ({ ...l, centerActive: id }));
 }
-
-// ---- inspector / bottom active tab ----
 
 export function setInspectorActive(id: InspectorId) {
   layout.update((l) => ({ ...l, inspectorActive: id }));
 }
 
-export function setBottomActive(id: BottomId) {
-  layout.update((l) => ({ ...l, bottomActive: id }));
-}
-
 // ---- area visibility ----
 
-export type AreaKey = "sidebar" | "inspector" | "bottom";
+export type AreaKey = "sidebar" | "inspector";
 
 export function toggleArea(area: AreaKey) {
   layout.update((l) => ({
@@ -117,8 +81,6 @@ export function setAreaVisible(area: AreaKey, visible: boolean) {
   }));
 }
 
-// ---- sizes ----
-
 export function setAreaSize(area: AreaKey, size: number) {
   layout.update((l) => ({
     ...l,
@@ -126,45 +88,55 @@ export function setAreaSize(area: AreaKey, size: number) {
   }));
 }
 
-// ---- convenience ----
+// ---- legacy shims — route old panel ids to the right new home ----
 
-export function showBottomTab(id: BottomId) {
-  layout.update((l) => ({
-    ...l,
-    bottomActive: id,
-    visible: { ...l.visible, bottom: true },
-  }));
-}
-
-// backward-compat shim for old callers still using toggleDock("left"|"right")
-export function toggleDock(which: "left" | "right" | "bottom" | AreaKey) {
-  const area: AreaKey = which === "left" ? "sidebar" : which === "right" ? "inspector" : which;
-  toggleArea(area as AreaKey);
-}
-
-export function setDockVisible(which: "left" | "right" | "bottom" | AreaKey, visible: boolean) {
-  const area: AreaKey = which === "left" ? "sidebar" : which === "right" ? "inspector" : which;
-  setAreaVisible(area as AreaKey, visible);
-}
-
-// Shim for legacy callers. Routes panel IDs to the right area in the new
-// layout regardless of the (now-meaningless) dock argument.
-// - inspector panels (variables/watch/resources) → setInspectorActive + show inspector
-// - bottom panels (terminal/console) → setBottomActive + show bottom
-// - "source" and everything else → no-op (Source is the always-visible main area)
-const INSPECTOR_IDS: ReadonlySet<InspectorId> = new Set(["variables", "watch", "resources"]);
-const BOTTOM_IDS: ReadonlySet<BottomId> = new Set(["terminal", "console"]);
+const INSPECTOR_IDS: ReadonlySet<InspectorId> = new Set([
+  "variables",
+  "watch",
+  "callstack",
+  "threads",
+  "resources",
+]);
+const CENTER_IDS: ReadonlySet<CenterTabId> = new Set(["source", "terminal", "console"]);
+const SIDEBAR_IDS: ReadonlySet<SidebarTabId> = new Set([
+  "sessions",
+  "filetree",
+  "breakpoints",
+]);
 
 export function setActivePanel(_which: "left" | "right" | "bottom", panelId: string) {
   if (INSPECTOR_IDS.has(panelId as InspectorId)) {
     setInspectorActive(panelId as InspectorId);
     setAreaVisible("inspector", true);
-  } else if (BOTTOM_IDS.has(panelId as BottomId)) {
-    setBottomActive(panelId as BottomId);
-    setAreaVisible("bottom", true);
+  } else if (CENTER_IDS.has(panelId as CenterTabId)) {
+    setCenterActive(panelId as CenterTabId);
+  } else if (SIDEBAR_IDS.has(panelId as SidebarTabId)) {
+    setSidebarActive(panelId as SidebarTabId);
+    setAreaVisible("sidebar", true);
   }
-  // source / other: always-visible or unknown; ignore
 }
 
-// Legacy — removed. Kept as no-op so old imports don't explode mid-migration.
-export function applyPanelSettings() { /* no-op: panels are now area-bound in registry */ }
+export function showCenterTab(id: CenterTabId) {
+  setCenterActive(id);
+}
+
+// accepted aliases: "bottom" is no longer a separate area — it means the
+// terminal/console tab in the center.
+export function showBottomTab(id: "terminal" | "console") {
+  setCenterActive(id);
+}
+
+export function toggleDock(which: "left" | "right" | "bottom" | AreaKey) {
+  if (which === "left") toggleArea("sidebar");
+  else if (which === "right") toggleArea("inspector");
+  else if (which === "sidebar" || which === "inspector") toggleArea(which);
+  // "bottom" → no-op (no separate bottom anymore)
+}
+
+export function setDockVisible(which: "left" | "right" | "bottom" | AreaKey, visible: boolean) {
+  if (which === "left") setAreaVisible("sidebar", visible);
+  else if (which === "right") setAreaVisible("inspector", visible);
+  else if (which === "sidebar" || which === "inspector") setAreaVisible(which, visible);
+}
+
+export function applyPanelSettings() { /* no-op */ }

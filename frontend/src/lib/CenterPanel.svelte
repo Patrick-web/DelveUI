@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { layout, setSidebarActive, type SidebarTabId } from "./panels/layout";
-  import SessionsPanel from "./SessionsPanel.svelte";
-  import FileTreePanel from "./FileTreePanel.svelte";
-  import BreakpointsPanel from "./BreakpointsPanel.svelte";
+  import { layout, setCenterActive, type CenterTabId } from "./panels/layout";
+  import SourcePanel from "./SourcePanel.svelte";
+  import TerminalPanel from "./TerminalPanel.svelte";
+  import ConsolePanel from "./ConsolePanel.svelte";
 
-  const tabs: { id: SidebarTabId; label: string }[] = [
-    { id: "sessions",    label: "Sessions" },
-    { id: "filetree",    label: "Files" },
-    { id: "breakpoints", label: "Breaks" },
+  const tabs: { id: CenterTabId; label: string }[] = [
+    { id: "terminal", label: "Terminal" },
+    { id: "console",  label: "Debug Console" },
+    { id: "source",   label: "Source" },
   ];
 
-  $: active = $layout.sidebarActive;
+  $: active = $layout.centerActive;
 </script>
 
-<aside class="sidebar">
+<div class="center">
   <div class="head">
     <div class="segmented" role="tablist">
       {#each tabs as t}
@@ -22,7 +22,7 @@
           class:active={active === t.id}
           role="tab"
           aria-selected={active === t.id}
-          on:click={() => setSidebarActive(t.id)}
+          on:click={() => setCenterActive(t.id)}
         >
           {t.label}
         </button>
@@ -30,33 +30,27 @@
     </div>
   </div>
   <div class="body">
-    <div class="pane" hidden={active !== "sessions"}>
-      <SessionsPanel />
+    <div class="pane" hidden={active !== "terminal"}>
+      <TerminalPanel />
     </div>
-    <div class="pane" hidden={active !== "filetree"}>
-      <FileTreePanel hideHeader />
+    <div class="pane" hidden={active !== "console"}>
+      <ConsolePanel />
     </div>
-    <div class="pane" hidden={active !== "breakpoints"}>
-      <BreakpointsPanel hideHeader />
+    <div class="pane" hidden={active !== "source"}>
+      <SourcePanel />
     </div>
   </div>
-</aside>
+</div>
 
 <style>
-  .sidebar {
+  .center {
     display: flex;
     flex-direction: column;
     height: 100%;
     min-height: 0;
+    background: var(--bg);
     overflow: hidden;
-    background: var(--bg-subtle);
-    border-right: 1px solid var(--border-subtle);
   }
-  :global(body.mac) .sidebar {
-    border-right-color: rgba(0, 0, 0, 0.35);
-    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.025);
-  }
-
   .head {
     display: flex;
     align-items: center;
