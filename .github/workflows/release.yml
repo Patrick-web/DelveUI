@@ -72,6 +72,25 @@ jobs:
             echo "No Developer ID found, using ad-hoc signing"
             codesign --force --deep --sign - --entitlements build/darwin/entitlements.plist DelveUI.app
           fi
+      - name: Notarize and staple
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_TEAM_ID" ] || [ -z "$APPLE_APP_PASSWORD" ]; then
+            echo "::warning::Notarization secrets missing; skipping notarization. Downloaded app will be blocked by Gatekeeper."
+            exit 0
+          fi
+          ditto -c -k --sequesterRsrc --keepParent DelveUI.app /tmp/DelveUI-notarize.zip
+          xcrun notarytool submit /tmp/DelveUI-notarize.zip \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+          xcrun stapler staple DelveUI.app
+          spctl -a -vvv -t execute DelveUI.app || true
+          rm /tmp/DelveUI-notarize.zip
       - name: Create zip + DMG with Applications shortcut
         run: |
           ditto -c -k --sequesterRsrc --keepParent DelveUI.app DelveUI-macOS-${{ github.ref_name }}.zip
