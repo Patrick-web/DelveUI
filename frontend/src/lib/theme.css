@@ -212,7 +212,7 @@ input.tx:focus, .tx:focus {
 
 /* terminal output category colors */
 .cat-stderr { color: var(--danger); }
-.cat-dlv-stdout, .cat-dlv-stderr { opacity: 0.5; }
+.cat-dlv-stdout, .cat-dlv-stderr { color: var(--text-muted); }
 .cat-console { color: var(--info); }
 .cat-important { color: var(--warning); }
 

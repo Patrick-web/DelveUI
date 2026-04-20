@@ -78,16 +78,45 @@
   function onSelect(sessionId: string | undefined) {
     if (sessionId) activeSessionId.set(sessionId);
   }
+
+  // --- filter ---
+  let filter = "";
+  function fuzzy(q: string, s: string): boolean {
+    if (!q) return true;
+    const hay = s.toLowerCase();
+    const needle = q.toLowerCase();
+    let i = 0;
+    for (const c of hay) { if (c === needle[i]) i++; if (i === needle.length) return true; }
+    return false;
+  }
+  $: visibleRows = filter ? rows.filter((r) => fuzzy(filter, r.label)) : rows;
 </script>
 
+<div class="sp-root">
+  <div class="sp-filter">
+    <Icon icon="solar:magnifer-linear" size={12} color="var(--text-faint)" />
+    <input
+      class="sp-filter-input"
+      placeholder="Filter…"
+      bind:value={filter}
+      spellcheck="false"
+    />
+    {#if filter}
+      <button class="sp-clear" title="Clear" on:click={() => (filter = "")}>
+        <Icon icon="solar:close-circle-linear" size={12} />
+      </button>
+    {/if}
+  </div>
 <div class="sp-body">
   {#if rows.length === 0}
     <div class="empty">
       No debug configurations.<br />
       Open a <code>debug.json</code> to add some.
     </div>
+  {:else if visibleRows.length === 0}
+    <div class="empty">No matches for &ldquo;{filter}&rdquo;.</div>
   {:else}
-    {#each rows as r (r.key)}
+    {#each visibleRows as r (r.key)}
       {@const running = isRunning(r.state)}
       <div
         class="sp-row"
@@ -135,15 +164,59 @@
     {/each}
   {/if}
 </div>
+</div>
 
 <style>
+  .sp-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .sp-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 6px 4px 6px;
+    padding: 0 8px;
+    height: 26px;
+    background: var(--bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 5px;
+    flex-shrink: 0;
+  }
+  .sp-filter:focus-within { border-color: var(--accent); }
+  .sp-filter-input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font-size: var(--text-xs);
+    font-family: var(--font-ui);
+    outline: none;
+    padding: 0;
+  }
+  .sp-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 0;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+  }
+  .sp-clear:hover { color: var(--text); }
   .sp-body {
     flex: 1;
     min-height: 0;
     overflow: auto;
     display: flex;
     flex-direction: column;
-    padding: 4px 0;
+    padding: 2px 0 4px 0;
   }
   .empty {
     padding: var(--space-3);

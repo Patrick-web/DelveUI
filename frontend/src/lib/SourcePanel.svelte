@@ -7,13 +7,14 @@
   import { vim, Vim } from "@replit/codemirror-vim";
   import { search, openSearchPanel, searchKeymap } from "@codemirror/search";
   import { defaultKeymap } from "@codemirror/commands";
-  import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, scrollToLineRequest, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes } from "./store";
+  import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, scrollToLineRequest, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes, workspace } from "./store";
   import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
   import { showInfo, showError } from "./toast";
   import { appSettings } from "./settings-store";
-  import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
+  import SymbolPicker from "./SymbolPicker.svelte";
   import { readFile } from "./store";
+  import { extractGoSymbols, enclosingFunction, type GoSymbol } from "./go-symbols";
 
   let editorEl: HTMLDivElement;
   let view: EditorView | null = null;
@@ -190,6 +191,7 @@
       }]),
       EditorView.updateListener.of((u) => {
         if (u.docChanged) dirty = true;
+        if (u.docChanged || u.selectionSet) scheduleSymbolRefresh();
       }),
       lineNumbers({
         domEventHandlers: {
@@ -271,6 +273,9 @@
     // Apply initial breakpoints + current line
     updateDecorations(bpLines, currentLine);
     if (currentLine > 0) scrollToLine(currentLine);
+
+    // Initial symbol scan (tree takes a microtask to be available)
+    scheduleSymbolRefresh();
   }
 
   function updateDecorations(lines: number[], curLine: number) {
@@ -378,37 +383,140 @@
     } catch { inlineVarText = ""; }
   }
 
+  // --- Symbols + breadcrumb ---
+  let symbols: GoSymbol[] = [];
+  let currentFunc: GoSymbol | null = null;
+  let symbolPickerOpen = false;
+
+  // Derive a friendly relative path: strip the workspace root or the
+  // active config's cwd/program prefix if present.
+  $: relPath = (() => {
+    if (!path) return "";
+    const root = $workspace?.root ?? "";
+    if (root && path.startsWith(root + "/")) return path.slice(root.length + 1);
+    const cfg = $activeSession?.cfg as any;
+    for (const base of [cfg?.cwd, cfg?.program].filter(Boolean)) {
+      const b = String(base).replace(/\/+$/, "");
+      if (path.startsWith(b + "/")) return path.slice(b.length + 1);
+    }
+    // fall back to the last three segments
+    return path.split("/").slice(-3).join("/");
+  })();
+  $: pathSegments = relPath ? relPath.split("/") : [];
+
+  function refreshSymbols() {
+    if (!view) { symbols = []; currentFunc = null; return; }
+    try {
+      symbols = extractGoSymbols(view.state);
+      const pos = view.state.selection.main.head;
+      currentFunc = enclosingFunction(view.state, pos);
+    } catch {
+      symbols = [];
+      currentFunc = null;
+    }
+  }
+
+  let symbolRefreshTimer: any = null;
+  function scheduleSymbolRefresh() {
+    if (symbolRefreshTimer) return;
+    symbolRefreshTimer = setTimeout(() => {
+      symbolRefreshTimer = null;
+      refreshSymbols();
+    }, 120);
+  }
+
+  function gotoSymbol(sym: GoSymbol) {
+    if (!view) return;
+    const doc = view.state.doc;
+    if (sym.line < 1 || sym.line > doc.lines) return;
+    const lineInfo = doc.line(sym.line);
+    view.dispatch({
+      selection: { anchor: lineInfo.from },
+      effects: EditorView.scrollIntoView(lineInfo.from, { y: "center" }),
+    });
+    view.focus();
+  }
+
+  function openSymbolPicker() {
+    refreshSymbols();
+    symbolPickerOpen = true;
+  }
+
+  function openFindPanel() {
+    if (!view) return;
+    openSearchPanel(view);
+  }
+
+  // Cmd+Shift+O while editor is focused → open symbol picker
+  function onPanelKey(e: KeyboardEvent) {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.shiftKey && e.key.toLowerCase() === "o") {
+      e.preventDefault();
+      openSymbolPicker();
+    }
+  }
+
   onDestroy(() => { if (view) { view.destroy(); view = null; } });
 </script>
 
 <svelte:window on:click={() => ctxOpen && closeCtx()} />
 
-<PanelHeader title="Source">
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<div class="sp-root" role="region" on:keydown={onPanelKey}>
   {#if path}
-    <span class="path-hint">{shortPath(path)}</span>
-    {#if dirty}
-      <span class="dirty-dot" title="Unsaved changes">●</span>
-      <button class="btn icon" title="Save (⌘S)" on:click={saveFile}>
-        <Icon icon="solar:diskette-bold" size={12} />
-      </button>
-    {/if}
-  {/if}
-</PanelHeader>
-
-{#if inlineVarText}
-  <div class="inline-bar">{inlineVarText}</div>
-{/if}
-
-<div class="editor-wrap">
-  {#if !path}
-    <div class="empty">
-      <Icon icon="solar:code-2-bold-duotone" size={24} color="var(--text-faint)" />
-      <span>Open a file from the Files panel or press <strong>⌘O</strong></span>
+    <div class="breadcrumb">
+      <div class="crumbs">
+        {#each pathSegments as seg, i}
+          {#if i > 0}
+            <Icon icon="solar:alt-arrow-right-linear" size={10} color="var(--text-faint)" />
+          {/if}
+          <span class="crumb" class:leaf={i === pathSegments.length - 1}>{seg}</span>
+        {/each}
+        {#if currentFunc}
+          <Icon icon="solar:alt-arrow-right-linear" size={10} color="var(--text-faint)" />
+          <button class="crumb-func" title="Go to symbol (⌘⇧O)" on:click={openSymbolPicker}>
+            <Icon icon="solar:code-square-bold" size={11} color="var(--info)" />
+            <span>{currentFunc.name}</span>
+            <Icon icon="solar:alt-arrow-down-linear" size={9} color="var(--text-faint)" />
+          </button>
+        {:else}
+          <button class="crumb-func ghost" title="Go to symbol (⌘⇧O)" on:click={openSymbolPicker}>
+            <Icon icon="solar:list-bold" size={11} color="var(--text-faint)" />
+            <span>Symbols</span>
+          </button>
+        {/if}
+      </div>
+      <div class="bc-actions">
+        <button class="btn icon" title="Find (⌘F)" on:click={openFindPanel}>
+          <Icon icon="solar:magnifer-linear" size={12} />
+        </button>
+        {#if dirty}
+          <span class="dirty-dot" title="Unsaved changes">●</span>
+          <button class="btn icon" title="Save (⌘S)" on:click={saveFile}>
+            <Icon icon="solar:diskette-bold" size={12} />
+          </button>
+        {/if}
+      </div>
     </div>
-  {:else}
-    <div class="cm-container" bind:this={editorEl}></div>
   {/if}
+
+  {#if inlineVarText}
+    <div class="inline-bar">{inlineVarText}</div>
+  {/if}
+
+  <div class="editor-wrap">
+    {#if !path}
+      <div class="empty">
+        <Icon icon="solar:code-2-bold-duotone" size={24} color="var(--text-faint)" />
+        <span>Open a file from the Files panel or press <strong>⌘O</strong></span>
+      </div>
+    {:else}
+      <div class="cm-container" bind:this={editorEl}></div>
+    {/if}
+  </div>
 </div>
+
+<SymbolPicker bind:open={symbolPickerOpen} {symbols} on:pick={(e) => gotoSymbol(e.detail)} />
 
 <!-- Context menu -->
 {#if ctxOpen}
@@ -444,8 +552,41 @@
 {/if}
 
 <style>
-  .path-hint { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sp-root { display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
+
+  /* Breadcrumb strip */
+  .breadcrumb {
+    display:flex; align-items:center; gap:var(--space-2);
+    height:28px; padding:0 var(--space-2);
+    border-bottom:1px solid var(--border-subtle);
+    background:var(--bg-elevated);
+    flex-shrink:0;
+    overflow:hidden;
+  }
+  .crumbs {
+    display:flex; align-items:center; gap:4px;
+    flex:1; min-width:0;
+    font-family:var(--font-mono); font-size:var(--text-xs);
+    overflow:hidden;
+  }
+  .crumb {
+    color:var(--text-faint);
+    white-space:nowrap;
+  }
+  .crumb.leaf { color:var(--text-muted); }
+  .crumb-func {
+    display:inline-flex; align-items:center; gap:4px;
+    background:transparent; border:0;
+    color:var(--text);
+    font-family:var(--font-mono); font-size:var(--text-xs);
+    padding:2px 6px; border-radius:4px; cursor:pointer;
+    white-space:nowrap;
+  }
+  .crumb-func:hover { background:var(--bg-subtle); }
+  .crumb-func.ghost { color:var(--text-faint); }
+  .bc-actions { display:flex; align-items:center; gap:2px; flex-shrink:0; }
   .dirty-dot { color:var(--warning); font-size:10px; }
+
   .editor-wrap { flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
   .cm-container { flex:1; overflow:hidden; }
   .cm-container :global(.cm-editor) { height:100%; }
