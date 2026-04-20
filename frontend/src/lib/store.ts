@@ -238,6 +238,25 @@ function removeSession(id: string) {
   });
 }
 
+export async function cleanDebugBinaries() {
+  try {
+    const result = (await SessionService.CleanDebugBinaries()) as any;
+    const { showInfo } = await import("./toast");
+    const count = result?.count ?? 0;
+    if (count === 0) {
+      showInfo("No debug binaries found", result?.dir ?? "");
+    } else {
+      showInfo(
+        `Cleaned ${count} debug binary file${count === 1 ? "" : "s"}`,
+        result?.dir ?? "",
+      );
+    }
+  } catch (e: any) {
+    const { showError } = await import("./toast");
+    showError("Failed to clean debug binaries", String(e?.message ?? e));
+  }
+}
+
 export async function control(
   action: "Continue" | "StepOver" | "StepIn" | "StepOut" | "Pause",
   id: string,

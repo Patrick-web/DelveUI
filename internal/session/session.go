@@ -14,6 +14,7 @@ import (
 
 	"github.com/jp/DelveUI/internal/config"
 	"github.com/jp/DelveUI/internal/dap"
+	"github.com/jp/DelveUI/internal/debugclean"
 )
 
 type State string
@@ -112,8 +113,13 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 	s.cmd = cmd
 	s.PID = cmd.Process.Pid
 
+	workDir := cmd.Dir
 	go func() {
 		err := cmd.Wait()
+		if removed, _ := debugclean.CleanDir(workDir); len(removed) > 0 {
+			s.emit(Event{Kind: "output", Category: "console",
+				Output: fmt.Sprintf("[delveui] cleaned %d debug binary file(s)\n", len(removed))})
+		}
 		s.emit(Event{Kind: "exited", Message: fmt.Sprintf("dlv exited: %v", err)})
 		s.setState(StateExited)
 	}()

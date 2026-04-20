@@ -11,6 +11,7 @@ export {
 };
 
 export {
+    CleanResult,
     DirEntry,
     ResourceInfo,
     SessionInfo,

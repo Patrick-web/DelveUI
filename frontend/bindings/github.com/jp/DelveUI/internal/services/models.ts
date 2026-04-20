@@ -15,6 +15,42 @@ import * as session$0 from "../session/models.js";
 // @ts-ignore: Unused imports
 import * as workspace$0 from "../workspace/models.js";
 
+/**
+ * CleanResult is returned by CleanDebugBinaries.
+ */
+export class CleanResult {
+    "dir": string;
+    "removed": string[];
+    "count": number;
+
+    /** Creates a new CleanResult instance. */
+    constructor($$source: Partial<CleanResult> = {}) {
+        if (!("dir" in $$source)) {
+            this["dir"] = "";
+        }
+        if (!("removed" in $$source)) {
+            this["removed"] = [];
+        }
+        if (!("count" in $$source)) {
+            this["count"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CleanResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CleanResult {
+        const $$createField1_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("removed" in $$parsedSource) {
+            $$parsedSource["removed"] = $$createField1_0($$parsedSource["removed"]);
+        }
+        return new CleanResult($$parsedSource as Partial<CleanResult>);
+    }
+}
+
 export class DirEntry {
     "name": string;
     "path": string;
@@ -132,7 +168,7 @@ export class SessionInfo {
      * Creates a new SessionInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionInfo {
-        const $$createField6_0 = $$createType0;
+        const $$createField6_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("cfg" in $$parsedSource) {
             $$parsedSource["cfg"] = $$createField6_0($$parsedSource["cfg"]);
@@ -163,7 +199,7 @@ export class StartResult {
      * Creates a new StartResult instance from a string or object.
      */
     static createFrom($$source: any = {}): StartResult {
-        const $$createField0_0 = $$createType1;
+        const $$createField0_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("session" in $$parsedSource) {
             $$parsedSource["session"] = $$createField0_0($$parsedSource["session"]);
@@ -205,8 +241,8 @@ export class WorkspaceInfo {
      * Creates a new WorkspaceInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): WorkspaceInfo {
-        const $$createField2_0 = $$createType2;
-        const $$createField3_0 = $$createType4;
+        const $$createField2_0 = $$createType3;
+        const $$createField3_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("configs" in $$parsedSource) {
             $$parsedSource["configs"] = $$createField2_0($$parsedSource["configs"]);
@@ -219,8 +255,9 @@ export class WorkspaceInfo {
 }
 
 // Private type creation functions
-const $$createType0 = config$0.LaunchConfig.createFrom;
-const $$createType1 = SessionInfo.createFrom;
-const $$createType2 = $Create.Array($$createType0);
-const $$createType3 = workspace$0.Recent.createFrom;
-const $$createType4 = $Create.Array($$createType3);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = config$0.LaunchConfig.createFrom;
+const $$createType2 = SessionInfo.createFrom;
+const $$createType3 = $Create.Array($$createType1);
+const $$createType4 = workspace$0.Recent.createFrom;
+const $$createType5 = $Create.Array($$createType4);

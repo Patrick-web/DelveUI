@@ -9,6 +9,7 @@
     stopSession,
     startSession,
     pickDebugFile,
+    cleanDebugBinaries,
   } from "./store";
   import { toggleDock } from "./panels/layout";
   import {
@@ -81,6 +82,11 @@
         id: "debugfiles.detect",
         label: "Debug Files: Auto-detect configs…",
         run: () => onOpenImport(),
+      },
+      {
+        id: "debug.cleanBinaries",
+        label: "Debug: Clean debug binaries",
+        run: () => cleanDebugBinaries(),
       },
       { id: "view.left", label: "View: Toggle Left Dock", run: () => toggleDock("left") },
       { id: "view.right", label: "View: Toggle Right Dock", run: () => toggleDock("right") },

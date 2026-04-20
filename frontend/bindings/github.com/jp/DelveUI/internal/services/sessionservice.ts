@@ -26,6 +26,17 @@ export function AppResources(): $CancellablePromise<$models.ResourceInfo> {
     });
 }
 
+/**
+ * CleanDebugBinaries removes Delve's auto-generated __debug_bin* files from
+ * the current workspace root (recursively). Also sweeps each launch config's
+ * cwd/program dir, since those may sit outside the workspace root.
+ */
+export function CleanDebugBinaries(): $CancellablePromise<$models.CleanResult> {
+    return $Call.ByID(1589582440).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
 export function Continue(id: string): $CancellablePromise<void> {
     return $Call.ByID(304844008, id);
 }
@@ -43,7 +54,7 @@ export function KillPort(port: number): $CancellablePromise<void> {
 
 export function List(): $CancellablePromise<$models.SessionInfo[]> {
     return $Call.ByID(2563233365).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -59,7 +70,7 @@ export function Resources(id: string): $CancellablePromise<$models.ResourceInfo>
 
 export function Restart(id: string): $CancellablePromise<$models.StartResult> {
     return $Call.ByID(135540608, id).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
@@ -81,7 +92,7 @@ export function StackTrace(id: string, threadID: number): $CancellablePromise<an
 
 export function Start(cfgID: string): $CancellablePromise<$models.StartResult> {
     return $Call.ByID(3762002571, cfgID).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
@@ -116,6 +127,7 @@ export function Variables(id: string, ref: number): $CancellablePromise<any> {
 // Private type creation functions
 const $$createType0 = $models.ResourceInfo.createFrom;
 const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $models.SessionInfo.createFrom;
-const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = $models.StartResult.createFrom;
+const $$createType2 = $models.CleanResult.createFrom;
+const $$createType3 = $models.SessionInfo.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = $models.StartResult.createFrom;

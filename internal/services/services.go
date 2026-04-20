@@ -13,6 +13,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/jp/DelveUI/internal/config"
+	"github.com/jp/DelveUI/internal/debugclean"
 	"github.com/jp/DelveUI/internal/session"
 	"github.com/jp/DelveUI/internal/workspace"
 )
@@ -460,6 +461,52 @@ func psStats(pid int) (rssMb float64, cpu string, elapsed string) {
 		elapsed = fields[2]
 	}
 	return
+}
+
+// CleanResult is returned by CleanDebugBinaries.
+type CleanResult struct {
+	Dir     string   `json:"dir"`
+	Removed []string `json:"removed"`
+	Count   int      `json:"count"`
+}
+
+// CleanDebugBinaries removes Delve's auto-generated __debug_bin* files from
+// the current workspace root (recursively). Also sweeps each launch config's
+// cwd/program dir, since those may sit outside the workspace root.
+func (s *SessionService) CleanDebugBinaries() (CleanResult, error) {
+	root := s.ws.Root()
+	seen := map[string]bool{}
+	var all []string
+	if root != "" {
+		xs, _ := debugclean.CleanRecursive(root)
+		for _, p := range xs {
+			if !seen[p] {
+				seen[p] = true
+				all = append(all, p)
+			}
+		}
+	}
+	for _, cfg := range s.ws.Configs() {
+		for _, d := range []string{cfg.Cwd, cfg.Program} {
+			if d == "" {
+				continue
+			}
+			if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
+				continue
+			}
+			xs, _ := debugclean.CleanDir(d)
+			for _, p := range xs {
+				if !seen[p] {
+					seen[p] = true
+					all = append(all, p)
+				}
+			}
+		}
+	}
+	if root == "" && len(all) == 0 {
+		return CleanResult{}, errors.New("no workspace open")
+	}
+	return CleanResult{Dir: root, Removed: all, Count: len(all)}, nil
 }
 
 // KillPort finds and kills the process listening on the given TCP port.
