@@ -4,7 +4,7 @@
   import { EditorState, Compartment } from "@codemirror/state";
   import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
   import { json } from "@codemirror/lang-json";
-  import { oneDark } from "@codemirror/theme-one-dark";
+  import { editorTheme, editorHighlighting } from "./editor-theme";
   import { vim } from "@replit/codemirror-vim";
   import { bracketMatching, indentOnInput, foldGutter, foldKeymap } from "@codemirror/language";
   import Icon from "./Icon.svelte";
@@ -52,7 +52,8 @@
             bracketMatching(),
             indentOnInput(),
             json(),
-            oneDark,
+            editorTheme,
+            editorHighlighting,
             keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
             EditorView.updateListener.of((u) => {
               if (u.docChanged) dirty = true;

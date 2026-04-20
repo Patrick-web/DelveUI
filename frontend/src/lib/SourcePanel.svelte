@@ -3,7 +3,7 @@
   import { EditorView, gutter, GutterMarker, lineNumbers, highlightActiveLine, keymap, Decoration, type DecorationSet } from "@codemirror/view";
   import { EditorState, StateField, StateEffect, RangeSet, Compartment } from "@codemirror/state";
   import { go } from "@codemirror/lang-go";
-  import { oneDark } from "@codemirror/theme-one-dark";
+  import { editorTheme, editorHighlighting } from "./editor-theme";
   import { vim, Vim } from "@replit/codemirror-vim";
   import { search, openSearchPanel, searchKeymap } from "@codemirror/search";
   import { defaultKeymap } from "@codemirror/commands";
@@ -184,7 +184,8 @@
     const extensions = [
       vimCompartment.of(vimEnabled ? vim() : []),
       go(),
-      oneDark,
+      editorTheme,
+      editorHighlighting,
       keymap.of([{
         key: "Mod-s",
         run: () => { saveFile(); return true; },

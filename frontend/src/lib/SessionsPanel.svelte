@@ -53,7 +53,18 @@
         });
       }
     }
-    return list;
+    // Running / in-flight rows float to the top; within each group the
+    // original order is preserved.
+    const running: Row[] = [];
+    const rest: Row[] = [];
+    for (const r of list) {
+      if (r.state === "running" || r.state === "stopped" || r.state === "starting") {
+        running.push(r);
+      } else {
+        rest.push(r);
+      }
+    }
+    return [...running, ...rest];
   })();
 
   function isRunning(state: string) {
@@ -134,7 +145,9 @@
           <span class="mode">{r.mode}</span>
         {/if}
         <span class="actions">
-          {#if running}
+          {#if r.state === "starting"}
+            <span class="spinner" title="Starting…" aria-label="Starting"></span>
+          {:else if running}
             <button
               class="act"
               title="Restart"
@@ -291,4 +304,23 @@
   .act.stop { color: var(--danger); }
   .sp-row.active .act.play { color: #a5e0a0; }
   .sp-row.active .act.stop { color: #ffb3b3; }
+
+  /* Starting spinner */
+  .spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    margin: 0 4px;
+    border: 1.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: sp-spin 0.8s linear infinite;
+  }
+  .sp-row.active .spinner {
+    border-color: rgba(255, 255, 255, 0.25);
+    border-top-color: #fff;
+  }
+  @keyframes sp-spin {
+    to { transform: rotate(360deg); }
+  }
 </style>
