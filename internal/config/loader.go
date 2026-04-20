@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/tailscale/hujson"
 )
@@ -67,6 +68,7 @@ func LoadFile(path string) ([]LaunchConfig, error) {
 				cfgs[i].ID = fmt.Sprintf("cfg-%d", i)
 			}
 		}
+		expandTemplateVars(cfgs, projectRoot(path))
 		return cfgs, nil
 	}
 
@@ -90,5 +92,51 @@ func LoadFile(path string) ([]LaunchConfig, error) {
 			cfgs[i].Language = "go"
 		}
 	}
+
+	// Expand editor template variables (Zed's $ZED_WORKTREE_ROOT, VS Code's
+	// ${workspaceFolder}) so downstream code sees real filesystem paths.
+	expandTemplateVars(cfgs, projectRoot(path))
 	return cfgs, nil
+}
+
+// projectRoot returns the worktree/project root for a debug config file.
+// If the config is in a dot-subdir (e.g. .zed/debug.json, .vscode/launch.json,
+// .delveui/debug.json), the project root is the parent of that subdir.
+// Otherwise it's the directory containing the file.
+func projectRoot(configPath string) string {
+	parent := filepath.Dir(configPath)
+	base := filepath.Base(parent)
+	if strings.HasPrefix(base, ".") {
+		return filepath.Dir(parent)
+	}
+	return parent
+}
+
+// expandTemplateVars substitutes the handful of editor template variables we
+// understand into cfg string fields. Safe to run on any config — unknown
+// files simply contain no matches.
+func expandTemplateVars(cfgs []LaunchConfig, root string) {
+	if root == "" {
+		return
+	}
+	r := strings.NewReplacer(
+		"$ZED_WORKTREE_ROOT", root,
+		"${ZED_WORKTREE_ROOT}", root,
+		"${workspaceFolder}", root,
+		"${workspaceRoot}", root,
+	)
+	for i := range cfgs {
+		cfgs[i].Program = r.Replace(cfgs[i].Program)
+		cfgs[i].Cwd = r.Replace(cfgs[i].Cwd)
+		cfgs[i].EnvFile = r.Replace(cfgs[i].EnvFile)
+		for j := range cfgs[i].Args {
+			cfgs[i].Args[j] = r.Replace(cfgs[i].Args[j])
+		}
+		for j := range cfgs[i].BuildFlags {
+			cfgs[i].BuildFlags[j] = r.Replace(cfgs[i].BuildFlags[j])
+		}
+		for k, v := range cfgs[i].Env {
+			cfgs[i].Env[k] = r.Replace(v)
+		}
+	}
 }
