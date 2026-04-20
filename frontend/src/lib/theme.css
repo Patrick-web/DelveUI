@@ -44,8 +44,8 @@
   --radius-md: 6px;
 
   /* typography */
-  --font-ui: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, system-ui, "Inter", "IBM Plex Sans", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "IBM Plex Mono", "JetBrains Mono", SFMono-Regular, Menlo, monospace;
   --font-terminal: var(--font-mono);
 
   --text-xs: 11px;
@@ -69,6 +69,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 html, body, #app, main { height: 100%; }
+
+/* On macOS, the Wails NSVisualEffectView is behind the webview.
+   Let surfaces show through where we can by making their bg rgba. */
+body.mac { background: transparent; }
+body.mac main { background: transparent; }
+body.mac .workspace { background: transparent; }
+body.mac .splitpanes.default-theme .splitpanes__pane { background: transparent; }
+body.mac .splitpanes.default-theme .splitpanes__splitter {
+  background: rgba(255, 255, 255, 0.06);
+}
 
 /* unified button */
 button.btn, .btn {

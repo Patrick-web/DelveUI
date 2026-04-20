@@ -87,15 +87,17 @@ func main() {
 		},
 	})
 
+	installAppMenu(app)
+
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "DelveUI",
 		Width:            1280,
 		Height:           820,
-		BackgroundColour: application.NewRGB(27, 29, 34),
+		BackgroundColour: application.NewRGBA(27, 29, 34, 0),
 		URL:              "/",
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 0,
-			Backdrop:                application.MacBackdropNormal,
+			Backdrop:                application.MacBackdropTranslucent,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 	})
@@ -134,4 +136,53 @@ func main() {
 		log.Fatal(err)
 	}
 	mgr.StopAll()
+}
+
+// installAppMenu wires the native macOS menu bar so keyboard shortcuts like
+// Cmd+Q / Cmd+W / Cmd+C get proper Mac behavior and the app feels native.
+func installAppMenu(app *application.App) {
+	menu := app.NewMenu()
+	menu.AddRole(application.AppMenu)
+
+	file := menu.AddSubmenu("File")
+	file.Add("Open debug.json…").SetAccelerator("CmdOrCtrl+Shift+O").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:open-debug-file", nil)
+	})
+	file.Add("Quick Open File…").SetAccelerator("CmdOrCtrl+O").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:quick-open", nil)
+	})
+	file.AddSeparator()
+	file.AddRole(application.CloseWindow)
+
+	menu.AddRole(application.EditMenu)
+	menu.AddRole(application.ViewMenu)
+
+	debug := menu.AddSubmenu("Debug")
+	debug.Add("Continue").SetAccelerator("F5").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:debug-control", "Continue")
+	})
+	debug.Add("Pause").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:debug-control", "Pause")
+	})
+	debug.Add("Step Over").SetAccelerator("F10").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:debug-control", "StepOver")
+	})
+	debug.Add("Step In").SetAccelerator("F11").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:debug-control", "StepIn")
+	})
+	debug.Add("Step Out").SetAccelerator("Shift+F11").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:debug-control", "StepOut")
+	})
+	debug.AddSeparator()
+	debug.Add("Stop").SetAccelerator("Shift+F5").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:debug-control", "Stop")
+	})
+	debug.Add("Command Palette…").SetAccelerator("CmdOrCtrl+Shift+P").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:command-palette", nil)
+	})
+
+	menu.AddRole(application.WindowMenu)
+	menu.AddRole(application.HelpMenu)
+
+	app.Menu.Set(menu)
 }

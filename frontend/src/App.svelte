@@ -36,6 +36,20 @@
   let showWelcome = false;
 
   onMount(async () => {
+    if (/Mac/i.test(navigator.platform) || /Mac/i.test(navigator.userAgent)) {
+      document.body.classList.add("mac");
+    }
+    const { Events } = await import("@wailsio/runtime");
+    Events.On("menu:command-palette", () => (paletteOpen = true));
+    Events.On("menu:quick-open", () => (quickOpenOpen = true));
+    Events.On("menu:open-debug-file", () => pickDebugFile());
+    Events.On("menu:debug-control", (e: any) => {
+      const action = (e?.data ?? e) as string;
+      const id = $activeSessionId;
+      if (!id) return;
+      if (action === "Stop") stopSession(id);
+      else control(action as any, id);
+    });
     await refreshWorkspace();
     await refreshSessions();
     const list = Object.values($sessions);
@@ -202,6 +216,11 @@
     -webkit-app-region: drag;
     padding: 0 var(--space-2);
     gap: 0;
+  }
+  :global(body.mac) .titlebar {
+    background: transparent;
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+    backdrop-filter: saturate(1.3);
   }
 
   .tb-left, .tb-center, .tb-right {
