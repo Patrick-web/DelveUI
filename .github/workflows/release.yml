@@ -67,14 +67,14 @@ jobs:
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
           if [ -n "$IDENTITY" ]; then
             echo "Signing with: $IDENTITY"
-            # Go on macOS auto-adds an ad-hoc signature at build time that
-            # trips up bundle signing ("invalid Info.plist ... modified").
-            # Strip it before signing with the real identity.
+            # Strip Go's auto ad-hoc signature before re-signing.
             codesign --remove-signature DelveUI.app/Contents/MacOS/DelveUI || true
-            # Single-step sign on the bundle signs the main Mach-O automatically.
-            # --timestamp is required for notarization.
+            # Sign inner binary (with entitlements + hardened runtime + timestamp),
+            # then wrap the bundle. --timestamp is required for notarization.
             codesign --force --sign "$IDENTITY" --options runtime --timestamp \
               --entitlements build/darwin/entitlements.plist \
+              DelveUI.app/Contents/MacOS/DelveUI
+            codesign --force --sign "$IDENTITY" --options runtime --timestamp \
               DelveUI.app
             codesign --verify --strict --verbose=2 DelveUI.app
           else

@@ -6,7 +6,7 @@
         <key>CFBundleName</key>
             <string>DelveUI</string>
         <key>CFBundleExecutable</key>
-            <string>delveui</string>
+            <string>DelveUI</string>
         <key>CFBundleIdentifier</key>
             <string>com.delveui.app</string>
         <key>CFBundleVersion</key>
