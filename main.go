@@ -109,6 +109,7 @@ func main() {
 
 	wsSvc.SetApp(app)
 	detectSvc.SetApp(app)
+	updateSvc.SetApp(app)
 
 	trayCtrl := tray.New(app, win, wsSvc, sessSvc, mgr)
 

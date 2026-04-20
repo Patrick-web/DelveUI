@@ -7,6 +7,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 export function AppInfo(): $CancellablePromise<{ [_ in string]?: string }> {
@@ -16,12 +20,10 @@ export function AppInfo(): $CancellablePromise<{ [_ in string]?: string }> {
 }
 
 /**
- * ApplyUpdate opens the latest release page in the user's browser. In-place
- * binary replacement is not attempted here: macOS .app bundles are signed +
- * notarized and swapping the executable in-place breaks the bundle signature.
- * Users should download the new installer.
+ * ApplyUpdate swaps the running bundle/binary with the staged one and
+ * relaunches. macOS only for now; other platforms return an error.
  */
-export function ApplyUpdate(): $CancellablePromise<string> {
+export function ApplyUpdate(): $CancellablePromise<void> {
     return $Call.ByID(2502865495);
 }
 
@@ -33,6 +35,33 @@ export function CheckForUpdate(): $CancellablePromise<$models.UpdateInfo> {
 
 export function CurrentVersion(): $CancellablePromise<string> {
     return $Call.ByID(823731153);
+}
+
+/**
+ * DownloadUpdate pulls the appropriate artifact for this platform, extracts
+ * it to a temp directory, and stashes the resulting .app path. Progress is
+ * reported over the "update:progress" event every ~100ms.
+ * 
+ * Returns the path to the extracted .app (macOS) or the binary (Linux).
+ * Windows is not yet supported end-to-end — falls back to the release URL.
+ */
+export function DownloadUpdate(): $CancellablePromise<string> {
+    return $Call.ByID(949988903);
+}
+
+/**
+ * OpenReleasePage asks the OS to open the latest-release URL in the default
+ * browser. Used as a fallback when auto-download isn't supported.
+ */
+export function OpenReleasePage(): $CancellablePromise<void> {
+    return $Call.ByID(1705768580);
+}
+
+/**
+ * SetApp wires the Wails app so the service can emit runtime events.
+ */
+export function SetApp(app: application$0.App | null): $CancellablePromise<void> {
+    return $Call.ByID(2759773541, app);
 }
 
 // Private type creation functions

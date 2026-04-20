@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import Icon from "./Icon.svelte";
   import {
     appSettings,
@@ -31,6 +31,11 @@
   let updateInfo: any = null;
   let checking = false;
   let appInfo: any = null;
+  type UpdateState = "idle" | "downloading" | "ready" | "error";
+  let updateState: UpdateState = "idle";
+  let dlBytes = 0;
+  let dlTotal = 0;
+  let dlError = "";
 
   async function checkUpdates() {
     checking = true;
@@ -51,6 +56,61 @@
   async function loadAppInfo() {
     try { appInfo = await UpdateService.AppInfo() as any; } catch {}
   }
+
+  async function downloadUpdate() {
+    updateState = "downloading";
+    dlBytes = 0;
+    dlTotal = 0;
+    dlError = "";
+    try {
+      await UpdateService.DownloadUpdate();
+      // progress handler (below) flips state to "ready" on done.
+    } catch (e: any) {
+      updateState = "error";
+      dlError = String(e?.message ?? e);
+    }
+  }
+
+  async function relaunchNewVersion() {
+    try {
+      await UpdateService.ApplyUpdate();
+      // App will quit itself; nothing else to do.
+    } catch (e: any) {
+      updateState = "error";
+      dlError = String(e?.message ?? e);
+    }
+  }
+
+  async function openReleaseInBrowser() {
+    try {
+      await (UpdateService as any).OpenReleasePage?.();
+    } catch {}
+  }
+
+  // Subscribe to backend download progress once; update reactive state.
+  let progressUnsub: (() => void) | null = null;
+  onMount(async () => {
+    const { Events } = await import("@wailsio/runtime");
+    progressUnsub = Events.On("update:progress", (ev: any) => {
+      const d = ev?.data ?? ev ?? {};
+      if (d.error) { updateState = "error"; dlError = d.error; return; }
+      if (typeof d.downloaded === "number") dlBytes = d.downloaded;
+      if (typeof d.total === "number" && d.total > 0) dlTotal = d.total;
+      if (d.done) updateState = "ready";
+    });
+  });
+
+  onDestroy(() => {
+    if (progressUnsub) progressUnsub();
+  });
+
+  function fmtBytes(n: number): string {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  $: dlPercent = dlTotal > 0 ? Math.min(100, Math.round((dlBytes / dlTotal) * 100)) : 0;
   import * as ThemeService from "../../bindings/github.com/jp/DelveUI/internal/themes/service";
   import * as SettingsServiceBinding from "../../bindings/github.com/jp/DelveUI/internal/settings/service";
   import * as DebugFilesStoreBinding from "../../bindings/github.com/jp/DelveUI/internal/debugfiles/store";
@@ -471,9 +531,33 @@
                   <span class="card-desc">{updateInfo.releaseNotes.slice(0, 120)}{updateInfo.releaseNotes.length > 120 ? "…" : ""}</span>
                 {/if}
               </div>
-              <a href={updateInfo.releaseUrl || "https://github.com/Patrick-web/DelveUI/releases/latest"} target="_blank" class="btn primary sm">
-                Download
-              </a>
+
+              {#if updateState === "idle"}
+                <button class="btn primary sm" on:click={downloadUpdate}>
+                  <Icon icon="solar:download-minimalistic-bold" size={11} /> Download
+                </button>
+              {:else if updateState === "downloading"}
+                <div class="dl">
+                  <div class="dl-bar">
+                    <div class="dl-fill" style:width="{dlPercent}%"></div>
+                  </div>
+                  <div class="dl-meta">
+                    {dlPercent}% — {fmtBytes(dlBytes)}{dlTotal ? " / " + fmtBytes(dlTotal) : ""}
+                  </div>
+                </div>
+              {:else if updateState === "ready"}
+                <button class="btn primary sm" on:click={relaunchNewVersion}>
+                  <Icon icon="solar:restart-bold" size={11} /> Relaunch
+                </button>
+              {:else if updateState === "error"}
+                <div class="dl-err">
+                  <span class="err-text">{dlError || "Download failed"}</span>
+                  <button class="btn outlined sm" on:click={openReleaseInBrowser}>
+                    Open release page
+                  </button>
+                  <button class="btn sm" on:click={downloadUpdate}>Retry</button>
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
@@ -590,6 +674,44 @@
   .toggle input { accent-color:var(--accent); }
   .about-text { font-size:var(--text-sm); color:var(--text-muted); }
   .update-available { background:rgba(152,195,121,0.08); }
+
+  .dl {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 180px;
+  }
+  .dl-bar {
+    height: 6px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .dl-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 120ms linear;
+  }
+  .dl-meta {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    text-align: right;
+  }
+  .dl-err {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .dl-err .err-text {
+    font-size: 11px;
+    color: var(--danger);
+    font-family: var(--font-mono);
+    max-width: 220px;
+    text-align: right;
+  }
 
   .confirm-overlay {
     position:absolute; inset:0; background:rgba(0,0,0,0.5);
