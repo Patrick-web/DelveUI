@@ -67,11 +67,8 @@ jobs:
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
           if [ -n "$IDENTITY" ]; then
             echo "Signing with: $IDENTITY"
-            # Sign inner binary first, then the app bundle (replaces deprecated --deep).
+            # Single-step sign on the bundle signs the main Mach-O automatically.
             # --timestamp is required for notarization.
-            codesign --force --sign "$IDENTITY" --options runtime --timestamp \
-              --entitlements build/darwin/entitlements.plist \
-              DelveUI.app/Contents/MacOS/DelveUI
             codesign --force --sign "$IDENTITY" --options runtime --timestamp \
               --entitlements build/darwin/entitlements.plist \
               DelveUI.app
