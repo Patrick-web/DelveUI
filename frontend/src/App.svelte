@@ -218,9 +218,10 @@
     gap: 0;
   }
   :global(body.mac) .titlebar {
-    background: transparent;
-    border-bottom-color: rgba(255, 255, 255, 0.06);
-    backdrop-filter: saturate(1.3);
+    height: 44px;
+    background: linear-gradient(to bottom, #22252d, #1b1d23);
+    border-bottom-color: rgba(0, 0, 0, 0.45);
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03), 0 1px 0 rgba(255, 255, 255, 0.02);
   }
 
   .tb-left, .tb-center, .tb-right {

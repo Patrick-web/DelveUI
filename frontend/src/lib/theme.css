@@ -1,22 +1,22 @@
 :root {
-  /* surfaces */
-  --bg:          #1b1d22;
-  --bg-elevated: #23262d;
-  --bg-subtle:   #15171b;
-  --surface:     #1f2127;
+  /* surfaces — deeper, richer tones for better perceived depth on macOS */
+  --bg:          #17191f;  /* content panels */
+  --bg-elevated: #1e2026;  /* titlebar, dropdowns */
+  --bg-subtle:   #0f1115;  /* deep chrome (sidebar, status bar, inputs) */
+  --surface:     #1a1c22;
 
   /* text */
-  --text:       #d4d7dd;
+  --text:       #d8dbe1;
   --text-muted: #8a8f99;
   --text-faint: #5a5f69;
 
-  /* borders */
-  --border:        #2b2e35;
-  --border-subtle: #22252b;
+  /* borders — hairline, higher contrast on dark to read crisply */
+  --border:        #2a2d35;
+  --border-subtle: #1d2026;
 
-  /* accent + semantic */
-  --accent:        #5b87d6;
-  --accent-subtle: rgba(91, 135, 214, 0.15);
+  /* accent + semantic — shift closer to macOS system blue */
+  --accent:        #4d9cff;
+  --accent-subtle: rgba(77, 156, 255, 0.18);
   --danger:  #e06c75;
   --warning: #e5c07b;
   --success: #98c379;
@@ -70,15 +70,21 @@ body {
 }
 html, body, #app, main { height: 100%; }
 
-/* On macOS, the Wails NSVisualEffectView is behind the webview.
-   Let surfaces show through where we can by making their bg rgba. */
-body.mac { background: transparent; }
-body.mac main { background: transparent; }
-body.mac .workspace { background: transparent; }
-body.mac .splitpanes.default-theme .splitpanes__pane { background: transparent; }
+/* macOS-specific polish: tighter hairline splitters, rounded outer corners */
 body.mac .splitpanes.default-theme .splitpanes__splitter {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--border-subtle);
 }
+body.mac .splitpanes.default-theme .splitpanes__splitter:hover {
+  background: var(--accent);
+}
+/* Native-feel scrollbars — thin, transparent track */
+body.mac ::-webkit-scrollbar { width: 8px; height: 8px; }
+body.mac ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border: 0;
+  border-radius: 4px;
+}
+body.mac ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
 
 /* unified button */
 button.btn, .btn {

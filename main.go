@@ -93,11 +93,11 @@ func main() {
 		Title:            "DelveUI",
 		Width:            1280,
 		Height:           820,
-		BackgroundColour: application.NewRGBA(27, 29, 34, 0),
+		BackgroundColour: application.NewRGB(18, 19, 23),
 		URL:              "/",
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 0,
-			Backdrop:                application.MacBackdropTranslucent,
+			Backdrop:                application.MacBackdropNormal,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 	})

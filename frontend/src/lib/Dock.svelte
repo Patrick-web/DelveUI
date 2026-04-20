@@ -126,16 +126,19 @@
   .dock.vertical {
     flex-direction: row;
   }
-  :global(body.mac) .dock { background: transparent; }
-  :global(body.mac) .dock.vertical { background: transparent; }
+  :global(body.mac) .dock { background: var(--bg); }
   :global(body.mac) .v-sidebar {
-    background: rgba(0, 0, 0, 0.12);
-    border-right-color: rgba(255, 255, 255, 0.04);
+    background: var(--bg-subtle);
+    border-right-color: rgba(0, 0, 0, 0.35);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.025);
   }
   :global(body.mac) .tabbar {
-    background: transparent;
-    border-bottom-color: rgba(255, 255, 255, 0.06);
+    background: var(--bg-subtle);
+    border-bottom-color: rgba(0, 0, 0, 0.45);
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.025);
   }
+  :global(body.mac) .v-tab.active { background: rgba(77, 156, 255, 0.12); }
+  :global(body.mac) .tab.active { border-bottom-color: var(--accent); }
 
   /* Horizontal tabs */
   .tabbar {
