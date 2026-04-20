@@ -119,3 +119,12 @@ func (s *Service) Update(next Settings) error {
 	s.applyDefaults()
 	return s.save()
 }
+
+// Reset clears all settings back to defaults and persists them.
+func (s *Service) Reset() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data = Settings{}
+	s.applyDefaults()
+	return s.save()
+}

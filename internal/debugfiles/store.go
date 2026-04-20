@@ -58,6 +58,14 @@ func (s *Store) save() error {
 	return os.WriteFile(s.path, b, 0o644)
 }
 
+// Clear removes every registered debug file entry.
+func (s *Store) Clear() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Entries = nil
+	return s.save()
+}
+
 func (s *Store) List() []Entry {
 	s.mu.Lock()
 	defer s.mu.Unlock()

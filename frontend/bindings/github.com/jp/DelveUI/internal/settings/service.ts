@@ -15,6 +15,13 @@ export function Get(): $CancellablePromise<$models.Settings> {
     });
 }
 
+/**
+ * Reset clears all settings back to defaults and persists them.
+ */
+export function Reset(): $CancellablePromise<void> {
+    return $Call.ByID(224651517);
+}
+
 export function Update(next: $models.Settings): $CancellablePromise<void> {
     return $Call.ByID(3175012467, next);
 }

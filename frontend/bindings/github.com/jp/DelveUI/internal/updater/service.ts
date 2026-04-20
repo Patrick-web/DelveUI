@@ -15,6 +15,12 @@ export function AppInfo(): $CancellablePromise<{ [_ in string]?: string }> {
     });
 }
 
+/**
+ * ApplyUpdate opens the latest release page in the user's browser. In-place
+ * binary replacement is not attempted here: macOS .app bundles are signed +
+ * notarized and swapping the executable in-place breaks the bundle signature.
+ * Users should download the new installer.
+ */
 export function ApplyUpdate(): $CancellablePromise<string> {
     return $Call.ByID(2502865495);
 }

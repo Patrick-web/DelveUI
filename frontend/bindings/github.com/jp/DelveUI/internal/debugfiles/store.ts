@@ -15,6 +15,13 @@ export function Add(path: string): $CancellablePromise<$models.Entry> {
     });
 }
 
+/**
+ * Clear removes every registered debug file entry.
+ */
+export function Clear(): $CancellablePromise<void> {
+    return $Call.ByID(435842770);
+}
+
 export function GetDefault(): $CancellablePromise<$models.Entry | null> {
     return $Call.ByID(1386815440).then(($result: any) => {
         return $$createType1($result);
