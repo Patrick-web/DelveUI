@@ -2,9 +2,13 @@
   import { activeSessionId, selectedFrameId } from "./store";
   import VariablesTree from "./VariablesTree.svelte";
   import PanelHeader from "./PanelHeader.svelte";
+
+  export let hideHeader = false;
 </script>
 
+{#if !hideHeader}
 <PanelHeader title="Variables" />
+{/if}
 
 <div class="body">
   {#if $activeSessionId && $selectedFrameId}

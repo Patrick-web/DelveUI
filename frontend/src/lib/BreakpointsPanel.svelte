@@ -1,11 +1,9 @@
 <script lang="ts">
   import { sessionState, setBreakpoints, activeSessionId, activeSession, globalBreakpoints, manualSourcePath, scrollToLineRequest } from "./store";
-  import { setActivePanel } from "./panels/layout";
 
   function goTo(path: string, line: number) {
     manualSourcePath.set(path);
     scrollToLineRequest.set(line);
-    setActivePanel("right", "source");
   }
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
@@ -42,8 +40,11 @@
       await setBreakpoints($activeSessionId, p, []);
     }
   }
+
+  export let hideHeader = false;
 </script>
 
+{#if !hideHeader}
 <PanelHeader title="Breakpoints">
   <label class="panic-toggle" title="Break on Go panic">
     <input type="checkbox" checked={breakOnPanic} on:change={togglePanic} disabled={!$activeSessionId} />
@@ -53,6 +54,7 @@
     <Icon icon="solar:trash-bin-minimalistic-linear" size={13} />
   </button>
 </PanelHeader>
+{/if}
 
 <div class="list">
   {#if entries.length === 0}

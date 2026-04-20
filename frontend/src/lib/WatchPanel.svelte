@@ -49,13 +49,17 @@
   function onKey(e: KeyboardEvent) {
     if (e.key === "Enter") addWatch();
   }
+
+  export let hideHeader = false;
 </script>
 
+{#if !hideHeader}
 <PanelHeader title="Watch">
   <button class="btn icon" title="Refresh all" on:click={refreshAll}>
     <Icon icon="solar:refresh-linear" size={13} />
   </button>
 </PanelHeader>
+{/if}
 
 <div class="body">
   <div class="add-row">

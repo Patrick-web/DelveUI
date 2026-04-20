@@ -6,11 +6,10 @@ import "@fontsource/ibm-plex-mono/500.css";
 import "./lib/theme.css";
 import { initTheme } from "./lib/theme-engine";
 import { loadSettings } from "./lib/settings-store";
-import { applyPanelSettings } from "./lib/panels/layout";
 import App from "./App.svelte";
 
 initTheme();
-loadSettings().then(() => applyPanelSettings());
+loadSettings();
 
 const app = new App({
   target: document.getElementById("app")!,

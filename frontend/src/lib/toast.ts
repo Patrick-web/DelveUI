@@ -32,9 +32,8 @@ export function showError(title: string, body?: string) {
     action: {
       label: "Show Terminal",
       run: () => {
-        import("./panels/layout").then(({ setDockVisible, setActivePanel }) => {
-          setDockVisible("bottom", true);
-          setActivePanel("bottom", "terminal");
+        import("./panels/layout").then(({ showBottomTab }) => {
+          showBottomTab("terminal");
         });
       },
     },
