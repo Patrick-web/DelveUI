@@ -10,6 +10,7 @@ export type Layout = {
   inspectorActive: InspectorId;
   sizes: { sidebar: number; inspector: number };
   visible: { sidebar: boolean; inspector: boolean };
+  envExpanded: boolean;
 };
 
 const STORAGE_KEY = "delveui.layout.v8";
@@ -21,6 +22,7 @@ function defaultLayout(): Layout {
     inspectorActive: "variables",
     sizes: { sidebar: 18, inspector: 22 },
     visible: { sidebar: true, inspector: true },
+    envExpanded: false,
   };
 }
 
@@ -86,6 +88,16 @@ export function setAreaSize(area: AreaKey, size: number) {
     ...l,
     sizes: { ...l.sizes, [area]: size },
   }));
+}
+
+// ---- env drawer ----
+
+export function toggleEnvDrawer() {
+  layout.update((l) => ({ ...l, envExpanded: !l.envExpanded }));
+}
+
+export function setEnvExpanded(expanded: boolean) {
+  layout.update((l) => ({ ...l, envExpanded: expanded }));
 }
 
 // ---- legacy shims — route old panel ids to the right new home ----
