@@ -1,8 +1,12 @@
 <script lang="ts">
   import { layout, setCenterActive, type CenterTabId } from "./panels/layout";
+  import { workspace } from "./store";
   import SourcePanel from "./SourcePanel.svelte";
   import TerminalPanel from "./TerminalPanel.svelte";
   import ConsolePanel from "./ConsolePanel.svelte";
+  import ProjectSelector from "./ProjectSelector.svelte";
+
+  export let onOpenImport: () => void = () => {};
 
   const tabs: { id: CenterTabId; label: string }[] = [
     { id: "terminal", label: "Terminal" },
@@ -11,35 +15,40 @@
   ];
 
   $: active = $layout.centerActive;
+  $: hasProject = !!$workspace?.debugFile;
 </script>
 
 <div class="center">
-  <div class="head">
-    <div class="segmented" role="tablist">
-      {#each tabs as t}
-        <button
-          class="seg"
-          class:active={active === t.id}
-          role="tab"
-          aria-selected={active === t.id}
-          on:click={() => setCenterActive(t.id)}
-        >
-          {t.label}
-        </button>
-      {/each}
+  {#if !hasProject}
+    <ProjectSelector {onOpenImport} />
+  {:else}
+    <div class="head">
+      <div class="segmented" role="tablist">
+        {#each tabs as t}
+          <button
+            class="seg"
+            class:active={active === t.id}
+            role="tab"
+            aria-selected={active === t.id}
+            on:click={() => setCenterActive(t.id)}
+          >
+            {t.label}
+          </button>
+        {/each}
+      </div>
     </div>
-  </div>
-  <div class="body">
-    <div class="pane" hidden={active !== "terminal"}>
-      <TerminalPanel />
+    <div class="body">
+      <div class="pane" hidden={active !== "terminal"}>
+        <TerminalPanel />
+      </div>
+      <div class="pane" hidden={active !== "console"}>
+        <ConsolePanel />
+      </div>
+      <div class="pane" hidden={active !== "source"}>
+        <SourcePanel />
+      </div>
     </div>
-    <div class="pane" hidden={active !== "console"}>
-      <ConsolePanel />
-    </div>
-    <div class="pane" hidden={active !== "source"}>
-      <SourcePanel />
-    </div>
-  </div>
+  {/if}
 </div>
 
 <style>

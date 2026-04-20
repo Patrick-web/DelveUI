@@ -207,7 +207,7 @@
       {/if}
 
       <Pane minSize={30}>
-        <CenterPanel />
+        <CenterPanel onOpenImport={() => (importWizardOpen = true)} />
       </Pane>
 
       {#if $layout.visible.inspector}
