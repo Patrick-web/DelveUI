@@ -59,11 +59,10 @@
   export let onOpenImport: () => void = () => {};
 
   type Tab = "appearance" | "terminal" | "debugfiles" | "general";
-  const allTabs: Tab[] = ["appearance", "terminal", "panels", "debugfiles", "general"];
+  const allTabs: Tab[] = ["appearance", "terminal", "debugfiles", "general"];
   const tabIcons: Record<Tab, string> = {
     appearance: "solar:palette-bold",
     terminal: "solar:monitor-bold",
-    panels: "solar:widget-bold",
     debugfiles: "solar:document-bold",
     general: "solar:settings-bold",
   };
