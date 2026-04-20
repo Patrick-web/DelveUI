@@ -13,7 +13,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/blang/semver"
@@ -353,7 +352,7 @@ open "$OLD"
 	}
 
 	cmd := exec.Command("/bin/bash", scriptPath)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	detachCmd(cmd)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Start(); err != nil {
