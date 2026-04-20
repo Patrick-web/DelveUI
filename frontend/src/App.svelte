@@ -4,7 +4,6 @@
   import {
     workspace,
     sessions,
-    sessionState,
     activeSessionId,
     activeSession,
     refreshWorkspace,
@@ -15,7 +14,9 @@
     restartSession,
     control,
   } from "./lib/store";
-  import Dock from "./lib/Dock.svelte";
+  import Sidebar from "./lib/Sidebar.svelte";
+  import CenterPanel from "./lib/CenterPanel.svelte";
+  import Inspector from "./lib/Inspector.svelte";
   import StatusBar from "./lib/StatusBar.svelte";
   import CommandPalette from "./lib/CommandPalette.svelte";
   import SettingsPage from "./lib/SettingsPage.svelte";
@@ -25,7 +26,7 @@
   import ConfigPicker from "./lib/ConfigPicker.svelte";
   import QuickOpen from "./lib/QuickOpen.svelte";
   import Icon from "./lib/Icon.svelte";
-  import { layout, setDockSize } from "./lib/panels/layout";
+  import { layout, setAreaSize, toggleArea } from "./lib/panels/layout";
 
   let cfgPickerOpen = false;
   let paletteOpen = false;
@@ -36,12 +37,27 @@
   let showWelcome = false;
 
   onMount(async () => {
+    if (/Mac/i.test(navigator.platform) || /Mac/i.test(navigator.userAgent)) {
+      document.body.classList.add("mac");
+    }
+    const { Events } = await import("@wailsio/runtime");
+    Events.On("menu:command-palette", () => (paletteOpen = true));
+    Events.On("menu:quick-open", () => (quickOpenOpen = true));
+    Events.On("menu:open-debug-file", () => pickDebugFile());
+    Events.On("menu:debug-control", (e: any) => {
+      const action = (e?.data ?? e) as string;
+      const id = $activeSessionId;
+      if (!id) return;
+      if (action === "Stop") stopSession(id);
+      else control(action as any, id);
+    });
+
+    window.addEventListener("keydown", onLayoutKey);
     await refreshWorkspace();
     await refreshSessions();
     const list = Object.values($sessions);
     if (list.length && !$activeSessionId) activeSessionId.set(list[0].id);
 
-    // Show welcome on first launch (no configs loaded)
     const { loadDebugFiles, debugFiles } = await import("./lib/settings-store");
     await loadDebugFiles();
     const { get } = await import("svelte/store");
@@ -49,21 +65,62 @@
     if (files.length === 0 && !$workspace?.configs?.length) {
       showWelcome = true;
     }
+
+    return () => window.removeEventListener("keydown", onLayoutKey);
   });
 
+  function onLayoutKey(e: KeyboardEvent) {
+    const mod = e.metaKey || e.ctrlKey;
+    if (!mod) return;
+    // Cmd+0 → toggle sidebar
+    if (!e.altKey && !e.shiftKey && e.key === "0") {
+      e.preventDefault();
+      toggleArea("sidebar");
+      return;
+    }
+    // Cmd+Alt+0 → toggle inspector
+    if (e.altKey && !e.shiftKey && e.key === "0") {
+      e.preventDefault();
+      toggleArea("inspector");
+      return;
+    }
+  }
+
   $: sessionList = Object.values($sessions);
-  $: availableCfgs = ($workspace?.configs ?? []).filter((c: any) => !c.disabled && !sessionList.some(s => s.cfgId === c.id));
+  $: availableCfgs = ($workspace?.configs ?? []).filter(
+    (c: any) => !c.disabled && !sessionList.some((s) => s.cfgId === c.id),
+  );
 
   async function startFromPicker(cfgId: string) {
     cfgPickerOpen = false;
     await startSession(cfgId);
   }
 
+  async function onToolbarDblClick(e: MouseEvent) {
+    // Only zoom if the click landed on the drag region itself, not on an
+    // interactive descendant (buttons, inputs mark themselves no-drag).
+    const el = e.target as HTMLElement;
+    const style = getComputedStyle(el);
+    if (style.getPropertyValue("--wails-draggable").trim() !== "drag") return;
+    try {
+      const { Window } = await import("@wailsio/runtime");
+      await Window.ToggleMaximise();
+    } catch (err) {
+      console.error("zoom failed:", err);
+    }
+  }
+
   function onResize(e: CustomEvent<any>) {
     const panes = e.detail;
-    if (panes?.length === 2) {
-      setDockSize("left", panes[0].size);
-      setDockSize("right", panes[1].size);
+    if (!panes) return;
+    const vis = $layout.visible;
+    if (vis.sidebar && vis.inspector && panes.length === 3) {
+      setAreaSize("sidebar", panes[0].size);
+      setAreaSize("inspector", panes[2].size);
+    } else if (vis.sidebar && !vis.inspector && panes.length === 2) {
+      setAreaSize("sidebar", panes[0].size);
+    } else if (!vis.sidebar && vis.inspector && panes.length === 2) {
+      setAreaSize("inspector", panes[1].size);
     }
   }
 </script>
@@ -82,46 +139,41 @@
 <Toast />
 
 <main>
-  <!-- unified titlebar: drag region + tabs + controls -->
-  <div class="titlebar" data-wml-drag>
-    <!-- left: traffic light space + actions -->
-    <div class="tb-left" data-wml-no-drag>
-      <span class="logo">DelveUI</span>
-      <button class="btn outlined tb-btn" on:click={() => (configPickerOpen = true)} title="Switch debug configuration">
-        <Icon icon="solar:widget-bold" size={12} />
-        {$workspace?.debugFile ? $workspace.debugFile.split("/").slice(-3, -1).join("/") : "No project"}
-        <Icon icon="solar:alt-arrow-down-linear" size={10} />
-      </button>
-    </div>
+  <!-- Unified toolbar -->
+  <div class="toolbar" on:dblclick={onToolbarDblClick}>
+    <div class="tb-trafficlights"></div>
 
-    <!-- center: session tabs -->
-    <div class="tb-center" data-wml-no-drag>
-      {#each sessionList as s (s.id)}
-        <button
-          class="session-tab"
-          class:active={s.id === $activeSessionId}
-          on:click={() => activeSessionId.set(s.id)}
-        >
-          <span class="state-dot state-{s.state}">●</span>
-          <span class="tab-label">{s.label}</span>
-          <button
-            class="tab-close"
-            title="Stop & close"
-            on:click|stopPropagation={() => stopSession(s.id)}
-          >
-            <Icon icon="solar:close-circle-linear" size={11} />
+    <div class="tb-drag-spacer"></div>
+
+    <div class="tb-right">
+      {#if $activeSession}
+        <div class="segmented step-controls">
+          <button class="seg" title="Continue (F5)" on:click={() => $activeSessionId && control("Continue", $activeSessionId)}>
+            <Icon icon="solar:play-bold" size={12} />
           </button>
+          <button class="seg" title="Pause" on:click={() => $activeSessionId && control("Pause", $activeSessionId)}>
+            <Icon icon="solar:pause-bold" size={12} />
+          </button>
+          <button class="seg" title="Step Over (F10)" on:click={() => $activeSessionId && control("StepOver", $activeSessionId)}>
+            <Icon icon="solar:forward-2-bold" size={12} />
+          </button>
+          <button class="seg" title="Step In (F11)" on:click={() => $activeSessionId && control("StepIn", $activeSessionId)}>
+            <Icon icon="solar:arrow-down-bold" size={12} />
+          </button>
+          <button class="seg" title="Step Out (⇧F11)" on:click={() => $activeSessionId && control("StepOut", $activeSessionId)}>
+            <Icon icon="solar:arrow-up-bold" size={12} />
+          </button>
+          <button class="seg" title="Restart" on:click={() => $activeSessionId && restartSession($activeSessionId)}>
+            <Icon icon="solar:restart-bold" size={12} />
+          </button>
+        </div>
+        <button class="tb-pill danger" title="Stop (⇧F5)" on:click={() => $activeSessionId && stopSession($activeSessionId)}>
+          <Icon icon="solar:stop-bold" size={13} />
         </button>
-      {/each}
-      {#if sessionList.length === 0}
-        <span class="no-sessions">No sessions</span>
       {/if}
-    </div>
 
-    <!-- right: run + controls -->
-    <div class="tb-right" data-wml-no-drag>
-      <div class="picker">
-        <button class="btn primary tb-btn" on:click={() => (cfgPickerOpen = !cfgPickerOpen)}>
+      <div class="run-picker">
+        <button class="tb-pill primary" on:click={() => (cfgPickerOpen = !cfgPickerOpen)}>
           <Icon icon="solar:play-bold" size={12} />
           Run
           <Icon icon="solar:alt-arrow-down-linear" size={10} />
@@ -129,7 +181,9 @@
         {#if cfgPickerOpen}
           <div class="dd">
             {#if availableCfgs.length === 0}
-              <div class="dd-empty">{($workspace?.configs?.length ?? 0) > 0 ? "All configs are running" : "Open a project first"}</div>
+              <div class="dd-empty">
+                {($workspace?.configs?.length ?? 0) > 0 ? "All configs are running" : "Open a project first"}
+              </div>
             {/if}
             {#each availableCfgs as cfg}
               <button class="dd-item" on:click={() => startFromPicker(cfg.id)}>
@@ -140,44 +194,27 @@
           </div>
         {/if}
       </div>
-
-      {#if $activeSession}
-        <div class="controls">
-          <button class="btn icon tb-btn" title="Continue (F5)" on:click={() => $activeSessionId && control("Continue", $activeSessionId)}>
-            <Icon icon="solar:play-bold" size={13} />
-          </button>
-          <button class="btn icon tb-btn" title="Pause" on:click={() => $activeSessionId && control("Pause", $activeSessionId)}>
-            <Icon icon="solar:pause-bold" size={13} />
-          </button>
-          <button class="btn icon tb-btn" title="Step Over" on:click={() => $activeSessionId && control("StepOver", $activeSessionId)}>
-            <Icon icon="solar:forward-2-bold" size={13} />
-          </button>
-          <button class="btn icon tb-btn" title="Step In" on:click={() => $activeSessionId && control("StepIn", $activeSessionId)}>
-            <Icon icon="solar:arrow-down-bold" size={13} />
-          </button>
-          <button class="btn icon tb-btn" title="Step Out" on:click={() => $activeSessionId && control("StepOut", $activeSessionId)}>
-            <Icon icon="solar:arrow-up-bold" size={13} />
-          </button>
-          <button class="btn icon tb-btn" title="Restart" on:click={() => $activeSessionId && restartSession($activeSessionId)}>
-            <Icon icon="solar:restart-bold" size={13} />
-          </button>
-          <button class="btn icon tb-btn danger" title="Stop" on:click={() => $activeSessionId && stopSession($activeSessionId)}>
-            <Icon icon="solar:stop-bold" size={13} />
-          </button>
-        </div>
-      {/if}
     </div>
   </div>
 
-  <!-- two-panel layout -->
+  <!-- 3-column horizontal layout. Center always fills full height. -->
   <div class="workspace">
     <Splitpanes on:resized={onResize}>
-      <Pane size={$layout.sizes.left} minSize={3}>
-        <Dock dock="left" vertical onSettings={() => (settingsOpen = true)} />
+      {#if $layout.visible.sidebar}
+        <Pane size={$layout.sizes.sidebar} minSize={12} maxSize={35}>
+          <Sidebar />
+        </Pane>
+      {/if}
+
+      <Pane minSize={30}>
+        <CenterPanel />
       </Pane>
-      <Pane size={$layout.sizes.right} minSize={20}>
-        <Dock dock="right" />
-      </Pane>
+
+      {#if $layout.visible.inspector}
+        <Pane size={$layout.sizes.inspector} minSize={14} maxSize={40}>
+          <Inspector />
+        </Pane>
+      {/if}
     </Splitpanes>
   </div>
 
@@ -192,144 +229,88 @@
     overflow: hidden;
   }
 
-  .titlebar {
+  /* ---- Unified toolbar ---- */
+  .toolbar {
     display: flex;
     align-items: center;
-    height: 38px;
+    height: 48px;
     background: var(--bg-elevated);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
-    -webkit-app-region: drag;
-    padding: 0 var(--space-2);
+    padding: 0 12px 0 0;
     gap: 0;
+    /* Wails v3 window drag: whole bar is a drag handle. Interactive
+       children opt out with --wails-draggable: no-drag. */
+    --wails-draggable: drag;
+  }
+  :global(body.mac) .toolbar {
+    height: 52px;
+    background: linear-gradient(to bottom, var(--bg-elevated), var(--bg));
+    border-bottom-color: var(--border-subtle);
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03);
   }
 
-  .tb-left, .tb-center, .tb-right {
-    display: flex;
-    align-items: center;
-    -webkit-app-region: no-drag;
+  /* Reserve space for the native traffic lights (drag region inherits). */
+  .tb-trafficlights {
+    width: 78px;
+    height: 100%;
+    flex-shrink: 0;
   }
-  .tb-left {
-    gap: var(--space-1);
-    padding-left: 72px; /* macOS traffic light space */
-  }
-  .tb-center {
+  .tb-drag-spacer {
     flex: 1;
-    justify-content: center;
-    gap: 2px;
-    overflow: hidden;
-    padding: 0 var(--space-2);
+    height: 100%;
   }
+
+  /* Interactive zone on the right — buttons must not drag the window. */
   .tb-right {
-    gap: var(--space-1);
-  }
-
-  .tb-btn {
-    height: 24px;
-    padding: 0 8px;
-    font-size: var(--text-xs);
-  }
-
-  .logo {
-    font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    color: var(--text-faint);
-    margin-right: var(--space-1);
-  }
-
-  /* session tabs */
-  .session-tab {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-    height: 26px;
-    padding: 0 var(--space-2) 0 var(--space-2);
-    background: transparent;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-    font-family: var(--font-ui);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: color 80ms, border-color 80ms;
-    position: relative;
+    gap: 8px;
+    --wails-draggable: no-drag;
   }
-  .session-tab:hover {
-    color: var(--text);
-    background: var(--bg-subtle);
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  }
-  .session-tab.active {
-    color: var(--text);
-    border-bottom-color: var(--accent);
-    background: var(--bg);
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  }
-  .tab-label {
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .tab-close {
-    display: flex;
-    align-items: center;
-    background: transparent;
-    border: 0;
-    color: var(--text-faint);
-    cursor: pointer;
-    padding: 0;
-    margin-left: 2px;
-    opacity: 0;
-    transition: opacity 80ms;
-  }
-  .session-tab:hover .tab-close,
-  .session-tab.active .tab-close {
-    opacity: 1;
-  }
-  .tab-close:hover {
-    color: var(--danger);
-  }
+  /* The segmented step-control group is also interactive. */
+  .step-controls { --wails-draggable: no-drag; }
+  .step-controls .seg { width: 28px; padding: 0; }
 
-  .no-sessions {
-    color: var(--text-faint);
-    font-size: var(--text-xs);
-  }
-
-  /* dropdowns */
-  .picker { position: relative; }
+  .run-picker { position: relative; }
   .dd {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 6px);
     right: 0;
     background: var(--bg-elevated);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    min-width: 260px;
+    border-radius: 8px;
+    min-width: 280px;
     z-index: 100;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-    padding: var(--space-1) 0;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+    padding: 4px;
     max-height: 320px;
     overflow: auto;
   }
   .dd-item {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 8px;
     width: 100%;
     background: transparent;
     border: 0;
-    padding: 6px var(--space-3);
+    padding: 7px 10px;
     color: var(--text);
     font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
+    border-radius: 5px;
   }
-  .dd-item:hover { background: var(--bg-subtle); }
-  .dd-empty { padding: var(--space-2) var(--space-3); color: var(--text-faint); font-size: var(--text-sm); }
+  .dd-item:hover { background: var(--accent); color: #fff; }
+  .dd-empty {
+    padding: 10px 12px;
+    color: var(--text-faint);
+    font-size: var(--text-sm);
+  }
 
-  .controls { display: flex; gap: 1px; }
-
-  .workspace { flex: 1; min-height: 0; overflow: hidden; }
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
 </style>

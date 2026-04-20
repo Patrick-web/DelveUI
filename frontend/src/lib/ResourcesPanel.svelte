@@ -35,13 +35,17 @@
   function fmtMb(n: number) {
     return n < 1 ? `${(n * 1024).toFixed(0)} KB` : `${n.toFixed(1)} MB`;
   }
+
+  export let hideHeader = false;
 </script>
 
+{#if !hideHeader}
 <PanelHeader title="Resources">
   <button class="btn icon" title="Refresh" on:click={refresh}>
     <Icon icon="solar:refresh-linear" size={13} />
   </button>
 </PanelHeader>
+{/if}
 
 <div class="body">
   <table>

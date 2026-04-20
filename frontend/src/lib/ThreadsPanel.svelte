@@ -36,13 +36,17 @@
   });
   onDestroy(() => clearInterval(timer));
   $: if ($activeSessionId || $sessions) refresh();
+
+  export let hideHeader = false;
 </script>
 
+{#if !hideHeader}
 <PanelHeader title="Threads">
   <button class="btn icon" title="Refresh" on:click={refresh}>
     <Icon icon="solar:refresh-linear" size={13} />
   </button>
 </PanelHeader>
+{/if}
 
 <div class="body">
   {#if err}

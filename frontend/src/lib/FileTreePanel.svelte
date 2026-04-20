@@ -60,13 +60,17 @@
   }
 
   onMount(loadRoot);
+
+  export let hideHeader = false;
 </script>
 
+{#if !hideHeader}
 <PanelHeader title="Files">
   <button class="btn icon" title="Refresh" on:click={loadRoot}>
     <Icon icon="solar:refresh-linear" size={13} />
   </button>
 </PanelHeader>
+{/if}
 
 {#if projectDirs.length > 1}
   <div class="switcher">

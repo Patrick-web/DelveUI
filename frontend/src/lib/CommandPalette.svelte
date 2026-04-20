@@ -11,7 +11,7 @@
     pickDebugFile,
     cleanDebugBinaries,
   } from "./store";
-  import { toggleDock } from "./panels/layout";
+  import { toggleArea } from "./panels/layout";
   import {
     themeList,
     currentThemeName,
@@ -88,8 +88,8 @@
         label: "Debug: Clean debug binaries",
         run: () => cleanDebugBinaries(),
       },
-      { id: "view.left", label: "View: Toggle Left Dock", run: () => toggleDock("left") },
-      { id: "view.right", label: "View: Toggle Right Dock", run: () => toggleDock("right") },
+      { id: "view.sidebar",   label: "View: Toggle Sidebar",   hint: "⌘0",   run: () => toggleArea("sidebar") },
+      { id: "view.inspector", label: "View: Toggle Inspector", hint: "⌘⌥0",  run: () => toggleArea("inspector") },
     ];
     if ($activeSessionId) {
       const id = $activeSessionId;
@@ -232,9 +232,8 @@
     // Ctrl+` → focus terminal
     if (mod && e.key === "`") {
       e.preventDefault();
-      import("./panels/layout").then(({ setActivePanel, setDockVisible }) => {
-        setDockVisible("right", true);
-        setActivePanel("right", "terminal");
+      import("./panels/layout").then(({ showBottomTab }) => {
+        showBottomTab("terminal");
       });
       return;
     }

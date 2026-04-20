@@ -14,8 +14,6 @@
     type AppSettings,
     type DebugFileEntry,
   } from "./settings-store";
-  import { PANELS } from "./panels/registry";
-  import { applyPanelSettings } from "./panels/layout";
   import {
     themeList,
     currentThemeName,
@@ -60,12 +58,11 @@
   export let open = false;
   export let onOpenImport: () => void = () => {};
 
-  type Tab = "appearance" | "terminal" | "panels" | "debugfiles" | "general";
-  const allTabs: Tab[] = ["appearance", "terminal", "panels", "debugfiles", "general"];
+  type Tab = "appearance" | "terminal" | "debugfiles" | "general";
+  const allTabs: Tab[] = ["appearance", "terminal", "debugfiles", "general"];
   const tabIcons: Record<Tab, string> = {
     appearance: "solar:palette-bold",
     terminal: "solar:monitor-bold",
-    panels: "solar:widget-bold",
     debugfiles: "solar:document-bold",
     general: "solar:settings-bold",
   };
@@ -75,7 +72,6 @@
   const tabLabels: Record<Tab, string> = {
     appearance: "Appearance",
     terminal: "Terminal",
-    panels: "Panels",
     debugfiles: "Debug Files",
     general: "General",
   };
@@ -196,9 +192,6 @@
   function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     settings = { ...settings, [key]: value };
     save();
-    if (["leftPanels", "rightPanels", "defaultLeftTab", "defaultRightTab"].includes(key as string)) {
-      applyPanelSettings();
-    }
     applyFontSettings(settings);
   }
 
@@ -211,22 +204,6 @@
       const lh = s.lineHeight === "compact" ? "1.2" : s.lineHeight === "comfortable" ? "1.618" : "1.3";
       root.style.setProperty("--lh-standard", lh);
     }
-  }
-
-  function togglePanel(dock: "left" | "right", panelId: string) {
-    const key = dock === "left" ? "leftPanels" : "rightPanels";
-    const current = [...(settings[key] ?? [])];
-    const idx = current.indexOf(panelId);
-    if (idx >= 0) current.splice(idx, 1); else current.push(panelId);
-    updateSetting(key, current);
-  }
-
-  function movePanel(panelId: string, from: "left" | "right", to: "left" | "right") {
-    const fromKey = from === "left" ? "leftPanels" : "rightPanels";
-    const toKey = to === "left" ? "leftPanels" : "rightPanels";
-    settings = { ...settings, [fromKey]: (settings[fromKey] ?? []).filter(id => id !== panelId), [toKey]: [...(settings[toKey] ?? []), panelId] };
-    save();
-    applyPanelSettings();
   }
 
   // --- Debug files ---
@@ -409,48 +386,6 @@
             {/each}
           </div>
         </div>
-
-      {:else if tab === "panels"}
-        <h2>Panels</h2>
-        <p class="desc">Configure which tabs appear in each dock and which tab is focused by default.</p>
-
-        {#each [{ dock: "left", label: "Left Dock" }, { dock: "right", label: "Right Dock" }] as { dock, label } (dock)}
-          {@const key = dock === "left" ? "leftPanels" : "rightPanels"}
-          {@const defKey = dock === "left" ? "defaultLeftTab" : "defaultRightTab"}
-          <div class="dock-section">
-            <h3>{label}</h3>
-            <div class="field">
-              <span class="field-label">Visible Tabs</span>
-              <div class="panel-list">
-                {#each PANELS as p}
-                  {@const inThis = (settings[key] ?? []).includes(p.id)}
-                  {@const otherKey = dock === "left" ? "rightPanels" : "leftPanels"}
-                  {@const inOther = (settings[otherKey] ?? []).includes(p.id)}
-                  <label class="toggle">
-                    <input type="checkbox" checked={inThis} on:change={() => {
-                      if (inThis) togglePanel(dock, p.id);
-                      else if (inOther) movePanel(p.id, dock === "left" ? "right" : "left", dock);
-                      else togglePanel(dock, p.id);
-                    }} />
-                    <Icon icon={p.icon} size={13} />
-                    <span>{p.title}</span>
-                  </label>
-                {/each}
-              </div>
-            </div>
-            <div class="field">
-              <span class="field-label">Default Tab</span>
-              <div class="row" role="radiogroup" aria-label="Default {label} tab">
-                {#each (settings[key] ?? []) as id}
-                  {@const p = PANELS.find(pp => pp.id === id)}
-                  {#if p}
-                    <button class="btn" role="radio" aria-checked={settings[defKey] === id} class:primary={settings[defKey] === id} on:click={() => updateSetting(defKey, id)}>{p.title}</button>
-                  {/if}
-                {/each}
-              </div>
-            </div>
-          </div>
-        {/each}
 
       {:else if tab === "debugfiles"}
         <h2>Debug Files</h2>

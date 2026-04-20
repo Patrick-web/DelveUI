@@ -14,9 +14,13 @@
   function selectFrame(id: number) {
     selectedFrameId.set(id);
   }
+
+  export let hideHeader = false;
 </script>
 
+{#if !hideHeader}
 <PanelHeader title="Call Stack" />
+{/if}
 
 <div class="body">
   {#if stack.length === 0}
