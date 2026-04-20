@@ -67,7 +67,15 @@ jobs:
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
           if [ -n "$IDENTITY" ]; then
             echo "Signing with: $IDENTITY"
-            codesign --force --deep --sign "$IDENTITY" --entitlements build/darwin/entitlements.plist --options runtime DelveUI.app
+            # Sign inner binary first, then the app bundle (replaces deprecated --deep).
+            # --timestamp is required for notarization.
+            codesign --force --sign "$IDENTITY" --options runtime --timestamp \
+              --entitlements build/darwin/entitlements.plist \
+              DelveUI.app/Contents/MacOS/DelveUI
+            codesign --force --sign "$IDENTITY" --options runtime --timestamp \
+              --entitlements build/darwin/entitlements.plist \
+              DelveUI.app
+            codesign --verify --strict --verbose=2 DelveUI.app
           else
             echo "No Developer ID found, using ad-hoc signing"
             codesign --force --deep --sign - --entitlements build/darwin/entitlements.plist DelveUI.app
@@ -83,11 +91,24 @@ jobs:
             exit 0
           fi
           ditto -c -k --sequesterRsrc --keepParent DelveUI.app /tmp/DelveUI-notarize.zip
-          xcrun notarytool submit /tmp/DelveUI-notarize.zip \
+          # Capture submission ID so we can fetch Apple's log on failure
+          SUBMIT_OUT=$(xcrun notarytool submit /tmp/DelveUI-notarize.zip \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" \
-            --wait
+            --wait 2>&1) || NOTARIZE_FAILED=1
+          echo "$SUBMIT_OUT"
+          SUBMIT_ID=$(echo "$SUBMIT_OUT" | awk '/^  id: / {print $2; exit}')
+          if [ -n "$NOTARIZE_FAILED" ] || echo "$SUBMIT_OUT" | grep -q "status: Invalid"; then
+            echo "::error::Notarization failed. Fetching Apple's log..."
+            if [ -n "$SUBMIT_ID" ]; then
+              xcrun notarytool log "$SUBMIT_ID" \
+                --apple-id "$APPLE_ID" \
+                --team-id "$APPLE_TEAM_ID" \
+                --password "$APPLE_APP_PASSWORD"
+            fi
+            exit 1
+          fi
           xcrun stapler staple DelveUI.app
           spctl -a -vvv -t execute DelveUI.app || true
           rm /tmp/DelveUI-notarize.zip
