@@ -96,6 +96,20 @@
     await startSession(cfgId);
   }
 
+  async function onToolbarDblClick(e: MouseEvent) {
+    // Only zoom if the click landed on the drag region itself, not on an
+    // interactive descendant (buttons, inputs mark themselves no-drag).
+    const el = e.target as HTMLElement;
+    const style = getComputedStyle(el);
+    if (style.getPropertyValue("--wails-draggable").trim() !== "drag") return;
+    try {
+      const { Window } = await import("@wailsio/runtime");
+      await Window.ToggleMaximise();
+    } catch (err) {
+      console.error("zoom failed:", err);
+    }
+  }
+
   function onResize(e: CustomEvent<any>) {
     const panes = e.detail;
     if (!panes) return;
@@ -126,12 +140,12 @@
 
 <main>
   <!-- Unified toolbar -->
-  <div class="toolbar" data-wml-drag>
-    <div class="tb-trafficlights" data-wml-no-drag></div>
+  <div class="toolbar" on:dblclick={onToolbarDblClick}>
+    <div class="tb-trafficlights"></div>
 
     <div class="tb-drag-spacer"></div>
 
-    <div class="tb-right" data-wml-no-drag>
+    <div class="tb-right">
       {#if $activeSession}
         <div class="segmented step-controls">
           <button class="seg" title="Continue (F5)" on:click={() => $activeSessionId && control("Continue", $activeSessionId)}>
@@ -221,19 +235,22 @@
     align-items: center;
     height: 48px;
     background: var(--bg-elevated);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
-    -webkit-app-region: drag;
     padding: 0 12px 0 0;
     gap: 0;
+    /* Wails v3 window drag: whole bar is a drag handle. Interactive
+       children opt out with --wails-draggable: no-drag. */
+    --wails-draggable: drag;
   }
   :global(body.mac) .toolbar {
     height: 52px;
-    background: linear-gradient(to bottom, #22252d, #1b1d23);
-    border-bottom-color: rgba(0, 0, 0, 0.45);
+    background: linear-gradient(to bottom, var(--bg-elevated), var(--bg));
+    border-bottom-color: var(--border-subtle);
     box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03);
   }
 
+  /* Reserve space for the native traffic lights (drag region inherits). */
   .tb-trafficlights {
     width: 78px;
     height: 100%;
@@ -243,13 +260,16 @@
     flex: 1;
     height: 100%;
   }
+
+  /* Interactive zone on the right — buttons must not drag the window. */
   .tb-right {
     display: flex;
     align-items: center;
     gap: 8px;
-    -webkit-app-region: no-drag;
+    --wails-draggable: no-drag;
   }
-  .step-controls { -webkit-app-region: no-drag; }
+  /* The segmented step-control group is also interactive. */
+  .step-controls { --wails-draggable: no-drag; }
   .step-controls .seg { width: 28px; padding: 0; }
 
   .run-picker { position: relative; }

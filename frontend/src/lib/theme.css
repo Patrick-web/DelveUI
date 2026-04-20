@@ -379,7 +379,7 @@ input.tx:focus, .tx:focus {
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   cursor: pointer;
-  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
   transition: background 80ms ease;
 }
 .tb-pill:hover { background: rgba(255, 255, 255, 0.06); }
