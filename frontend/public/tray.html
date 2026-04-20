@@ -5,91 +5,163 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DelveUI Sessions</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    /* Inlined from theme.css — no imports in public/ pages. Defaults match the
+       app's active palette so the tray popup reads as part of the same app. */
+    --bg:          #17191f;
+    --bg-elevated: #1e2026;
+    --bg-subtle:   #0f1115;
+    --text:        #d8dbe1;
+    --text-muted:  #8a8f99;
+    --text-faint:  #5a5f69;
+    --border:        #2a2d35;
+    --border-subtle: #1d2026;
+    --accent:        #4d9cff;
+    --accent-subtle: rgba(77, 156, 255, 0.18);
+    --danger:  #e06c75;
+    --warning: #e5c07b;
+    --success: #98c379;
+    --info:    #61afef;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --font-ui: -apple-system, BlinkMacSystemFont, system-ui, "Inter", "IBM Plex Sans", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "IBM Plex Mono", SFMono-Regular, Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
-    font-family: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+    font-family: var(--font-ui);
     font-size: 12px;
-    background: rgba(27, 29, 34, 0.96);
-    color: #d4d7dd;
+    background: var(--bg);
+    color: var(--text);
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
     border-radius: 10px;
+    display: flex;
+    flex-direction: column;
   }
-  .header {
-    display: flex; align-items: center; padding: 10px 12px 6px;
-    border-bottom: 1px solid #2b2e35;
+
+  /* Header */
+  .head {
+    display: flex; align-items: center;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--border-subtle);
     gap: 6px;
+    flex-shrink: 0;
   }
-  .header h1 { font-size: 11px; font-weight: 600; color: #8a8f99; letter-spacing: 0.5px; text-transform: uppercase; flex: 1; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 4px;
-    background: transparent; border: 1px solid #2b2e35; color: #d4d7dd;
-    padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
-    font-family: inherit;
+  .head h1 {
+    font-size: 10px; font-weight: 700; color: var(--text-faint);
+    letter-spacing: 0.8px; text-transform: uppercase; flex: 1;
   }
-  .btn:hover { background: #23262d; }
-  .btn.primary { background: #5b87d6; border-color: #5b87d6; color: #fff; }
-  .btn.primary:hover { background: #6c97e2; }
-  .btn.danger:hover { color: #e06c75; }
 
-  .sessions { flex: 1; overflow: auto; padding: 6px 0; }
-  .session {
+  /* Pill buttons — matches .tb-pill in main app */
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: transparent; border: 0; color: var(--text);
+    padding: 0 10px; height: 24px; border-radius: var(--radius-md);
+    cursor: pointer; font: inherit; font-size: 11px;
+    transition: background 80ms ease;
+  }
+  .pill:hover { background: rgba(255, 255, 255, 0.06); }
+  .pill:active { background: rgba(255, 255, 255, 0.1); }
+  .pill.primary { background: var(--accent); color: #fff; }
+  .pill.primary:hover { background: #5ea6ff; }
+  .pill.danger { color: var(--danger); }
+  .pill.danger:hover { background: rgba(224, 108, 117, 0.12); }
+  .pill.icon { width: 24px; padding: 0; justify-content: center; }
+
+  /* Body list */
+  .sessions { flex: 1; overflow: auto; padding: 4px 6px; }
+  .row {
     display: flex; align-items: center; gap: 8px;
-    padding: 8px 12px; cursor: default;
+    padding: 6px 8px; cursor: pointer;
+    border-radius: 5px;
+    transition: background 80ms ease;
   }
-  .session:hover { background: #23262d; }
+  .row:hover { background: rgba(255, 255, 255, 0.04); }
+
   .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .dot.running { background: #98c379; }
-  .dot.stopped { background: #e5c07b; }
-  .dot.starting { background: #61afef; }
-  .dot.exited, .dot.error { background: #e06c75; }
-  .dot.idle { background: #5a5f69; }
+  .dot.running  { background: var(--success); }
+  .dot.stopped  { background: var(--warning); }
+  .dot.starting { background: var(--info); }
+  .dot.exited,
+  .dot.error    { background: var(--danger); }
+  .dot.idle     { background: var(--text-faint); }
+
   .info { flex: 1; min-width: 0; }
-  .name { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .meta { font-size: 10px; color: #8a8f99; font-family: "IBM Plex Mono", monospace; }
-  .actions { display: flex; gap: 2px; }
-  .actions .btn { padding: 2px 6px; border: 0; font-size: 13px; min-width: 24px; justify-content: center; }
-
-  .empty { padding: 20px 12px; text-align: center; color: #5a5f69; }
-  .run-section { border-top: 1px solid #2b2e35; padding: 8px 12px; }
-  .run-section h2 { font-size: 10px; color: #5a5f69; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .cfg-btn {
-    display: flex; align-items: center; gap: 6px; width: 100%;
-    background: transparent; border: 0; color: #d4d7dd;
-    padding: 5px 6px; border-radius: 4px; cursor: pointer;
-    font-size: 12px; font-family: inherit; text-align: left;
+  .name {
+    font-size: 12px; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .cfg-btn:hover { background: #23262d; }
-  .play { color: #98c379; font-size: 11px; }
+  .meta {
+    font-size: 10px; color: var(--text-faint);
+    font-family: var(--font-mono);
+  }
+  .actions { display: inline-flex; gap: 2px; flex-shrink: 0; }
 
+  .empty {
+    padding: 24px 12px; text-align: center;
+    color: var(--text-faint); font-size: 12px;
+  }
+
+  /* Launch section */
+  .launch {
+    border-top: 1px solid var(--border-subtle);
+    padding: 6px;
+    flex-shrink: 0;
+    max-height: 40%;
+    overflow: auto;
+  }
+  .launch h2 {
+    font-size: 10px; color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    padding: 4px 8px 4px; font-weight: 700;
+  }
+  .cfg {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: transparent; border: 0; color: var(--text);
+    padding: 5px 8px; border-radius: 5px; cursor: pointer;
+    font: inherit; font-size: 12px; text-align: left;
+  }
+  .cfg:hover { background: rgba(255, 255, 255, 0.04); }
+  .cfg .play {
+    color: var(--success);
+    display: inline-flex; width: 14px; justify-content: center;
+  }
+
+  /* Footer */
   .footer {
-    display: flex; gap: 4px; padding: 6px 12px;
-    border-top: 1px solid #2b2e35; justify-content: flex-end;
+    display: flex; gap: 4px; padding: 6px 8px;
+    border-top: 1px solid var(--border-subtle);
+    justify-content: flex-end; flex-shrink: 0;
   }
+
+  /* Minimal inline SVG icon styling */
+  .i { width: 12px; height: 12px; display: inline-block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 </head>
 <body>
-  <div class="header">
+  <div class="head">
     <h1>Sessions</h1>
-    <button class="btn" id="btn-show" title="Open main window">↗ Open</button>
+    <button class="pill" id="btn-show" title="Open main window">
+      <svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M7 7h10v10"/></svg>
+      Open
+    </button>
   </div>
 
   <div class="sessions" id="sessions"></div>
-  <div class="run-section" id="run-section" style="display:none">
+  <div class="launch" id="launch" style="display:none">
     <h2>Launch</h2>
     <div id="configs"></div>
   </div>
 
   <div class="footer">
-    <button class="btn danger" id="btn-stopall">Stop All</button>
+    <button class="pill danger" id="btn-stopall">Stop All</button>
   </div>
 
   <script type="module">
-    import { Call } from "/wails/runtime.js";
-    import { Events } from "/wails/runtime.js";
+    import { Call, Events } from "/wails/runtime.js";
 
-    // We call bound methods by name since this page doesn't use the generated bindings
-    // SessionService methods use Call.ByName
     async function callService(service, method, ...args) {
       return Call.ByName(`github.com/jp/DelveUI/internal/services.${service}.${method}`, ...args);
     }
@@ -99,7 +171,13 @@
 
     const sessionsEl = document.getElementById("sessions");
     const configsEl = document.getElementById("configs");
-    const runSection = document.getElementById("run-section");
+    const launchSection = document.getElementById("launch");
+
+    const ICONS = {
+      open:  '<svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M7 7h10v10"/></svg>',
+      stop:  '<svg class="i" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+      play:  '<svg class="i" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>',
+    };
 
     async function refresh() {
       // sessions
@@ -111,7 +189,8 @@
       } else {
         for (const s of list) {
           const div = document.createElement("div");
-          div.className = "session";
+          div.className = "row";
+          div.dataset.open = s.id;
           div.innerHTML = `
             <span class="dot ${s.state}"></span>
             <div class="info">
@@ -119,32 +198,32 @@
               <div class="meta">:${s.port} · PID ${s.pid} · ${s.state}</div>
             </div>
             <div class="actions">
-              <button class="btn" data-open="${s.id}" title="Open in main window">↗</button>
-              <button class="btn danger" data-stop="${s.id}" title="Stop">■</button>
+              <button class="pill icon" data-open="${s.id}" title="Open in main window">${ICONS.open}</button>
+              <button class="pill icon danger" data-stop="${s.id}" title="Stop">${ICONS.stop}</button>
             </div>
           `;
           sessionsEl.appendChild(div);
         }
       }
 
-      // configs
+      // configs (not currently running)
       let info = {};
       try { info = await callWS("Info"); } catch {}
       const cfgs = info.configs || [];
       const runningCfgIds = new Set((list || []).map(s => s.cfgId));
       const available = cfgs.filter(c => !runningCfgIds.has(c.id));
       if (available.length > 0) {
-        runSection.style.display = "";
+        launchSection.style.display = "";
         configsEl.innerHTML = "";
         for (const cfg of available) {
           const btn = document.createElement("button");
-          btn.className = "cfg-btn";
-          btn.innerHTML = `<span class="play">▶</span> ${esc(cfg.label)}`;
+          btn.className = "cfg";
+          btn.innerHTML = `<span class="play">${ICONS.play}</span><span>${esc(cfg.label)}</span>`;
           btn.onclick = () => startCfg(cfg.id);
           configsEl.appendChild(btn);
         }
       } else {
-        runSection.style.display = "none";
+        launchSection.style.display = "none";
       }
     }
 
@@ -156,21 +235,20 @@
     sessionsEl.addEventListener("click", async (e) => {
       const stopBtn = e.target.closest("[data-stop]");
       if (stopBtn) {
+        e.stopPropagation();
         await callService("SessionService", "Stop", stopBtn.dataset.stop);
         refresh();
         return;
       }
       const openBtn = e.target.closest("[data-open]");
       if (openBtn) {
-        // Focus main window & switch to this session
-        window.wails?.Window?.Show?.();
-        // Emit event so main app switches session
         Events.Emit("tray:open-session", openBtn.dataset.open);
       }
     });
 
     document.getElementById("btn-show").onclick = () => {
       window.wails?.Window?.Show?.();
+      Events.Emit("tray:open-session", "");
     };
     document.getElementById("btn-stopall").onclick = async () => {
       const list = await callService("SessionService", "List");
@@ -186,11 +264,9 @@
       return d.innerHTML;
     }
 
-    // Refresh on events
     Events.On("tray:sessions-changed", refresh);
     Events.On("session:event", refresh);
 
-    // Initial load
     refresh();
   </script>
 </body>
