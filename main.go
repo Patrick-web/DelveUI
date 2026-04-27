@@ -2,7 +2,12 @@ package main
 
 import (
 	"embed"
+	"flag"
 	"log"
+	"os"
+	"os/exec"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -25,6 +30,10 @@ var version = "dev"
 var assets embed.FS
 
 func main() {
+	var initialProject string
+	flag.StringVar(&initialProject, "project", "", "path to debug.json or project root to open on launch")
+	flag.Parse()
+
 	store, err := workspace.NewStore()
 	if err != nil {
 		log.Fatal(err)
@@ -61,9 +70,18 @@ func main() {
 	sessSvc := services.NewSessionService(mgr, wsSvc)
 	fileSvc := services.NewFileService()
 
-	// Auto-load default debug file on startup
-	if def := dbgFiles.GetDefault(); def != nil {
-		_, _ = wsSvc.OpenDebugFile(def.Path)
+	// Initial workspace priority:
+	//   1. --project flag       (explicit override, used when spawning a new window)
+	//   2. last active project  (already loaded by NewWorkspaceService from workspaces.json)
+	//   3. default debug file   (first-run / nothing-restored fallback)
+	if initialProject != "" {
+		if _, err := wsSvc.OpenDebugFile(initialProject); err != nil {
+			log.Printf("warning: --project %q: %v", initialProject, err)
+		}
+	} else if wsSvc.DebugFile() == "" {
+		if def := dbgFiles.GetDefault(); def != nil {
+			_, _ = wsSvc.OpenDebugFile(def.Path)
+		}
 	}
 
 	app := application.New(application.Options{
@@ -121,6 +139,27 @@ func main() {
 			win.Focus()
 		}
 	})
+
+	// Spawn a fresh DelveUI process pointed at a different project.
+	app.Event.On("project:open-new-window", func(e *application.CustomEvent) {
+		path, ok := e.Data.(string)
+		if !ok || path == "" {
+			return
+		}
+		exe, err := os.Executable()
+		if err != nil {
+			log.Printf("project:open-new-window: %v", err)
+			return
+		}
+		cmd := exec.Command(exe, "--project", path)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			log.Printf("project:open-new-window: %v", err)
+			return
+		}
+		go func() { _ = cmd.Wait() }()
+	})
 	_ = trayCtrl
 
 	sub := mgr.Subscribe()
@@ -133,10 +172,21 @@ func main() {
 	// Background update check 30s after launch
 	updater.BackgroundCheck(app, version, 30*time.Second)
 
-	if err := app.Run(); err != nil {
-		log.Fatal(err)
-	}
+	// Ensure dlv child processes are killed on SIGINT/SIGTERM, since those
+	// bypass the normal Wails shutdown path.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		mgr.StopAll()
+		app.Quit()
+	}()
+
+	runErr := app.Run()
 	mgr.StopAll()
+	if runErr != nil {
+		log.Fatal(runErr)
+	}
 }
 
 // installAppMenu wires the native macOS menu bar so keyboard shortcuts like

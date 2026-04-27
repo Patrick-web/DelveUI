@@ -13,27 +13,63 @@
   let el: HTMLDivElement;
   let atBottom = true;
 
+  // Cache ansi→html and the wrapping span per line object. Lines are pushed
+  // once and never mutated by the store, so identity is stable for their lifetime.
+  // Without this, every output event re-parses every history line — the dominant
+  // cost on long-running, chatty sessions.
+  type Line = { cat: string; text: string };
+  const ansiCache = new WeakMap<Line, string>();
+  const wrappedCache = new WeakMap<Line, string>(); // `<span class="cat-X">…</span>`
+
+  function wrappedFor(l: Line): string {
+    let w = wrappedCache.get(l);
+    if (w !== undefined) return w;
+    let h = ansiCache.get(l);
+    if (h === undefined) {
+      h = ansi.ansi_to_html(l.text);
+      ansiCache.set(l, h);
+    }
+    w = `<span class="cat-${l.cat}">${h}</span>`;
+    wrappedCache.set(l, w);
+    return w;
+  }
+
   $: rendered = buildRendered(lines, searchQuery);
 
-  function buildRendered(lines: { cat: string; text: string }[], query: string): string {
+  function buildRendered(lines: Line[], query: string): string {
+    // Hot path: no search query. Pure cache lookup + concat.
+    if (!query) {
+      matchCount = 0;
+      let out = "";
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        if (!filter(l.cat)) continue;
+        out += wrappedFor(l);
+      }
+      return out;
+    }
+
+    // Search path: highlight matches on top of cached ansi html.
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(${escaped})`, "gi");
     let count = 0;
-    const html = lines
-      .filter((l) => filter(l.cat))
-      .map((l) => {
-        let content = ansi.ansi_to_html(l.text);
-        if (query && query.length > 0) {
-          const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const re = new RegExp(`(${escaped})`, "gi");
-          content = content.replace(re, (m) => {
-            count++;
-            return `<mark class="search-hl">${m}</mark>`;
-          });
-        }
-        return `<span class="cat-${l.cat}">${content}</span>`;
-      })
-      .join("");
+    let out = "";
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (!filter(l.cat)) continue;
+      let h = ansiCache.get(l);
+      if (h === undefined) {
+        h = ansi.ansi_to_html(l.text);
+        ansiCache.set(l, h);
+      }
+      const highlighted = h.replace(re, (m) => {
+        count++;
+        return `<mark class="search-hl">${m}</mark>`;
+      });
+      out += `<span class="cat-${l.cat}">${highlighted}</span>`;
+    }
     matchCount = count;
-    return html;
+    return out;
   }
 
   afterUpdate(() => {

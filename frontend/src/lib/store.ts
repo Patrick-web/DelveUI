@@ -3,6 +3,7 @@ import { Events } from "@wailsio/runtime";
 import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
 import * as SessionService from "../../bindings/github.com/jp/DelveUI/internal/services/sessionservice";
 import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
+import { wrapHandler } from "./diagnostics";
 
 export type LaunchConfig = {
   id: string;
@@ -351,7 +352,7 @@ export async function readFile(path: string): Promise<string> {
 }
 
 // Wire Wails events.
-Events.On("session:event", async (ev: any) => {
+Events.On("session:event", wrapHandler("session:event", async (ev: any) => {
   const e: SessionEvent = ev.data;
   console.debug("[session:event]", e);
   ensureSession(e.sessionId);
@@ -458,7 +459,7 @@ Events.On("session:event", async (ev: any) => {
     // auto-refresh stack
     fetchStack(e.sessionId).catch(() => {});
   }
-});
+}));
 
 Events.On("workspace:changed", (ev: any) => {
   workspace.set(ev.data as WorkspaceInfo);

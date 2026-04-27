@@ -26,7 +26,9 @@
   import ConfigPicker from "./lib/ConfigPicker.svelte";
   import QuickOpen from "./lib/QuickOpen.svelte";
   import Icon from "./lib/Icon.svelte";
+  import ProjectSwitcher from "./lib/ProjectSwitcher.svelte";
   import { layout, setAreaSize, toggleArea } from "./lib/panels/layout";
+  import { startMainThreadProbe } from "./lib/diagnostics";
 
   let cfgPickerOpen = false;
   let paletteOpen = false;
@@ -37,6 +39,7 @@
   let showWelcome = false;
 
   onMount(async () => {
+    startMainThreadProbe();
     if (/Mac/i.test(navigator.platform) || /Mac/i.test(navigator.userAgent)) {
       document.body.classList.add("mac");
     }
@@ -143,7 +146,17 @@
   <div class="toolbar" on:dblclick={onToolbarDblClick}>
     <div class="tb-trafficlights"></div>
 
-    <div class="tb-drag-spacer"></div>
+    <div class="tb-left">
+      <ProjectSwitcher />
+    </div>
+
+    <div class="tb-center">
+      <button class="tb-cmd" title="Command Palette (⌘⇧P)" on:click={() => (paletteOpen = true)}>
+        <Icon icon="solar:command-linear" size={11} />
+        <span>Search anything…</span>
+        <span class="kbd">⌘⇧P</span>
+      </button>
+    </div>
 
     <div class="tb-right">
       {#if $activeSession}
@@ -171,6 +184,10 @@
           <Icon icon="solar:stop-bold" size={13} />
         </button>
       {/if}
+
+      <button class="tb-icon" title="Settings (⌘,)" on:click={() => (settingsOpen = true)}>
+        <Icon icon="solar:settings-linear" size={14} />
+      </button>
 
       <div class="run-picker">
         <button class="tb-pill primary" on:click={() => (cfgPickerOpen = !cfgPickerOpen)}>
@@ -256,9 +273,58 @@
     height: 100%;
     flex-shrink: 0;
   }
-  .tb-drag-spacer {
+  /* Interactive zone on the left — sits next to traffic lights. */
+  .tb-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 4px;
+    --wails-draggable: no-drag;
+  }
+
+  /* Centered command-palette button. The wrapping zone stays draggable;
+     only the inner button opts out so the rest of the empty bar still drags. */
+  .tb-center {
     flex: 1;
     height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 12px;
+  }
+  .tb-cmd {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    padding: 0 10px 0 10px;
+    background: var(--bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+    width: min(360px, 50%);
+    --wails-draggable: no-drag;
+  }
+  .tb-cmd:hover { background: var(--bg-elevated); border-color: var(--border); color: var(--text); }
+  .tb-cmd > span:not(.kbd) {
+    flex: 1;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 1px 5px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-faint);
+    background: var(--bg-elevated);
   }
 
   /* Interactive zone on the right — buttons must not drag the window. */
@@ -268,6 +334,19 @@
     gap: 8px;
     --wails-draggable: no-drag;
   }
+  .tb-icon {
+    width: 28px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .tb-icon:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); border-color: var(--border-subtle); }
   /* The segmented step-control group is also interactive. */
   .step-controls { --wails-draggable: no-drag; }
   .step-controls .seg { width: 28px; padding: 0; }
