@@ -20,6 +20,11 @@ type DetectedSource struct {
 	Configs     []config.LaunchConfig `json:"configs"`
 }
 
+// scanMaxDepth caps how many levels below $HOME `find` will descend. Real
+// monorepos can nest projects fairly deeply (e.g. .../build/<svc>/v<n>/.vscode),
+// so this needs headroom — pruneNames() carries the cost of going deeper.
+const scanMaxDepth = 10
+
 // pruneNames returns exact directory names to skip via find -prune.
 // Using -name (not -path) avoids substring matches like alis.build matching "build".
 func pruneNames() []string {
@@ -167,7 +172,7 @@ func shortDir(dir, home string) string {
 }
 
 func findGoProjects(root string) []string {
-	args := buildFindArgs(root, "-name", "go.mod", 6)
+	args := buildFindArgs(root, "-name", "go.mod", scanMaxDepth)
 	out, err := exec.Command("find", args...).Output()
 	if err != nil {
 		return nil
@@ -186,7 +191,7 @@ func findConfigsDirect(root string) []DetectedSource {
 	var results []DetectedSource
 
 	// .zed/debug.json
-	args := buildFindArgs(root, "-path", "*/.zed/debug.json", 6)
+	args := buildFindArgs(root, "-path", "*/.zed/debug.json", scanMaxDepth)
 	if out, err := exec.Command("find", args...).Output(); err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 			line = strings.TrimSpace(line)
@@ -204,7 +209,7 @@ func findConfigsDirect(root string) []DetectedSource {
 	}
 
 	// .vscode/launch.json
-	args = buildFindArgs(root, "-path", "*/.vscode/launch.json", 6)
+	args = buildFindArgs(root, "-path", "*/.vscode/launch.json", scanMaxDepth)
 	if out, err := exec.Command("find", args...).Output(); err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 			line = strings.TrimSpace(line)

@@ -31,6 +31,13 @@
   import { startMainThreadProbe } from "./lib/diagnostics";
 
   let cfgPickerOpen = false;
+  let runPickerEl: HTMLDivElement;
+
+  function onWindowClick(e: MouseEvent) {
+    if (!cfgPickerOpen) return;
+    const t = e.target as Node;
+    if (runPickerEl && !runPickerEl.contains(t)) cfgPickerOpen = false;
+  }
   let paletteOpen = false;
   let settingsOpen = false;
   let importWizardOpen = false;
@@ -138,6 +145,8 @@
 <ImportWizard bind:open={importWizardOpen} />
 <ConfigPicker bind:open={configPickerOpen} onOpenImport={() => (importWizardOpen = true)} />
 <QuickOpen bind:open={quickOpenOpen} />
+<svelte:window on:click={onWindowClick} />
+
 <WelcomePage visible={showWelcome} onDone={() => { showWelcome = false; refreshWorkspace(); }} />
 <Toast />
 
@@ -189,7 +198,7 @@
         <Icon icon="solar:settings-linear" size={14} />
       </button>
 
-      <div class="run-picker">
+      <div class="run-picker" bind:this={runPickerEl}>
         <button class="tb-pill primary" on:click={() => (cfgPickerOpen = !cfgPickerOpen)}>
           <Icon icon="solar:play-bold" size={12} />
           Run

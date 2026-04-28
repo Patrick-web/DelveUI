@@ -30,6 +30,7 @@ const (
 
 type Event struct {
 	SessionID string         `json:"sessionId"`
+	CfgID     string         `json:"cfgId,omitempty"`
 	Kind      string         `json:"kind"` // state | output | stopped | exited | threads | error
 	State     State          `json:"state,omitempty"`
 	Output    string         `json:"output,omitempty"`
@@ -55,7 +56,9 @@ type Session struct {
 		ThreadID int
 		Reason   string
 	}
-	bus func(Event)
+	bus         func(Event)
+	initialized chan struct{} // closed when DAP InitializedEvent arrives
+	cfgDoneOnce sync.Once
 }
 
 func (s *Session) State() State {
@@ -73,6 +76,7 @@ func (s *Session) setState(st State) {
 
 func (s *Session) emit(e Event) {
 	e.SessionID = s.ID
+	e.CfgID = s.CfgID
 	if s.bus != nil {
 		s.bus(e)
 	}
@@ -88,6 +92,7 @@ func (s *Session) StoppedThread() int {
 
 func (s *Session) start(ctx context.Context, dlvPath string) error {
 	s.setState(StateStarting)
+	s.initialized = make(chan struct{})
 
 	port, err := freePort()
 	if err != nil {
@@ -155,9 +160,30 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 	if err := client.Launch(launchArgs); err != nil {
 		return err
 	}
+	// Wait for InitializedEvent before returning so the frontend can set
+	// breakpoints during the DAP configuration phase. The frontend explicitly
+	// calls ConfigurationDone() after sending its breakpoints.
+	select {
+	case <-s.initialized:
+	case <-time.After(10 * time.Second):
+		return fmt.Errorf("timeout waiting for DAP InitializedEvent")
+	}
 	s.emit(Event{Kind: "output", Category: "console", Output: fmt.Sprintf("[delveui] Launched %s (program=%s, mode=%s) on dlv port %d\n", s.Cfg.Label, s.Cfg.Program, s.Cfg.Mode, s.Port)})
 	s.setState(StateRunning)
 	return nil
+}
+
+// ConfigurationDone tells dlv we're finished configuring (breakpoints, etc.)
+// so it can resume the program. Idempotent.
+func (s *Session) ConfigurationDone() error {
+	if s.client == nil {
+		return fmt.Errorf("session not running")
+	}
+	var err error
+	s.cfgDoneOnce.Do(func() {
+		err = s.client.ConfigurationDone()
+	})
+	return err
 }
 
 func (s *Session) eventLoop() {
@@ -173,10 +199,16 @@ func (s *Session) eventLoop() {
 			s.mu.Unlock()
 			s.emit(Event{Kind: "stopped", ThreadID: ev.Body.ThreadId, Reason: ev.Body.Reason, State: StateStopped})
 		case *godap.InitializedEvent:
-			// Delve is ready for breakpoints; tell it we're done configuring so it runs.
-			go func() {
-				_ = s.client.ConfigurationDone()
-			}()
+			// Delve is in the configuration phase. Signal start() so it can
+			// return; the frontend will send breakpoints and then explicitly
+			// call ConfigurationDone via SessionService.
+			if s.initialized != nil {
+				select {
+				case <-s.initialized:
+				default:
+					close(s.initialized)
+				}
+			}
 		case *godap.BreakpointEvent:
 			s.emit(Event{Kind: "breakpoint", Extra: map[string]any{
 				"reason":     ev.Body.Reason,

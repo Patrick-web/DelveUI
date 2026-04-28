@@ -37,6 +37,15 @@ export function CleanDebugBinaries(): $CancellablePromise<$models.CleanResult> {
     });
 }
 
+/**
+ * ConfigurationDone signals the DAP server that the client is finished with
+ * configuration (e.g. setting breakpoints) so the program can resume.
+ * Called by the frontend after start(), once breakpoints have been pushed.
+ */
+export function ConfigurationDone(id: string): $CancellablePromise<void> {
+    return $Call.ByID(1168870977, id);
+}
+
 export function Continue(id: string): $CancellablePromise<void> {
     return $Call.ByID(304844008, id);
 }

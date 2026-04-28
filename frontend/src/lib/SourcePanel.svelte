@@ -119,18 +119,38 @@
   class BreakpointMarker extends GutterMarker {
     toDOM() {
       const el = document.createElement("span");
+      el.className = "cm-bp-mark";
       el.textContent = "●";
-      el.style.color = "var(--danger)";
-      el.style.fontSize = "14px";
-      el.style.lineHeight = "1";
       return el;
     }
   }
   const breakpointMarker = new BreakpointMarker();
 
+  // Ghost marker rendered on every line without a real breakpoint. CSS keeps
+  // it invisible until the gutter cell (or the matching line-number cell)
+  // is hovered — that's where the "click to add" hint comes from.
+  class GhostBreakpointMarker extends GutterMarker {
+    toDOM() {
+      const el = document.createElement("span");
+      el.className = "cm-bp-ghost";
+      el.textContent = "●";
+      return el;
+    }
+  }
+  const ghostBreakpointMarker = new GhostBreakpointMarker();
+
   const breakpointGutter = gutter({
     class: "cm-breakpoint-gutter",
     markers: (v) => v.state.field(breakpointState),
+    lineMarker(view, line) {
+      const bps = view.state.field(breakpointState);
+      let hasBp = false;
+      bps.between(line.from, line.from, () => {
+        hasBp = true;
+        return false;
+      });
+      return hasBp ? null : ghostBreakpointMarker;
+    },
     initialSpacer: () => breakpointMarker,
     domEventHandlers: {
       mousedown(view, line) {
@@ -179,7 +199,12 @@
   // --- Editor creation ---
   function createEditor(text: string) {
     if (view) { view.destroy(); view = null; }
-    if (!editorEl) return;
+    if (!editorEl) {
+      // editorEl is always rendered (just hidden when path is empty), but
+      // guard anyway. Retry after the next tick — the bind should be in.
+      tick().then(() => { if (editorEl) createEditor(text); });
+      return;
+    }
 
     const extensions = [
       vimCompartment.of(vimEnabled ? vim() : []),
@@ -230,6 +255,21 @@
           justifyContent: "center",
           minWidth: "20px",
         },
+        ".cm-bp-mark": {
+          color: "var(--danger)",
+          fontSize: "14px",
+          lineHeight: "1",
+        },
+        ".cm-bp-ghost": {
+          color: "var(--danger)",
+          fontSize: "14px",
+          lineHeight: "1",
+          opacity: "0",
+          transition: "opacity 80ms ease-out",
+        },
+        ".cm-breakpoint-gutter .cm-gutterElement:hover .cm-bp-ghost, .cm-breakpoint-gutter .cm-gutterElement.cm-bp-hover .cm-bp-ghost": {
+          opacity: "0.35",
+        },
         ".cm-stopped-line": { backgroundColor: "rgba(229,192,123,0.15)", borderLeft: "2px solid var(--warning)" },
         ".cm-activeLine": { backgroundColor: "rgba(91,135,214,0.08)" },
         ".cm-activeLineGutter": { backgroundColor: "rgba(91,135,214,0.08)" },
@@ -277,6 +317,32 @@
 
     // Initial symbol scan (tree takes a microtask to be available)
     scheduleSymbolRefresh();
+
+    wireGutterHoverBridge(view);
+  }
+
+  // Hovering over a line number cell should also light up the breakpoint
+  // gutter cell on the same line so the ghost dot appears as an "add me" hint.
+  // The two gutters are CodeMirror siblings with parallel children, so we can
+  // forward the hover by index.
+  function wireGutterHoverBridge(v: EditorView) {
+    const root = v.dom;
+    let hovered: HTMLElement | null = null;
+    function clear() {
+      if (hovered) { hovered.classList.remove("cm-bp-hover"); hovered = null; }
+    }
+    root.addEventListener("mousemove", (e) => {
+      const t = e.target as HTMLElement;
+      const lineCell = t.closest?.(".cm-lineNumbers .cm-gutterElement") as HTMLElement | null;
+      if (!lineCell) { clear(); return; }
+      const idx = Array.prototype.indexOf.call(lineCell.parentElement!.children, lineCell);
+      const bpGutter = root.querySelector(".cm-breakpoint-gutter") as HTMLElement | null;
+      const next = bpGutter?.children?.[idx] as HTMLElement | undefined;
+      if (next === hovered) return;
+      clear();
+      if (next) { next.classList.add("cm-bp-hover"); hovered = next; }
+    });
+    root.addEventListener("mouseleave", clear);
   }
 
   function updateDecorations(lines: number[], curLine: number) {
@@ -511,9 +577,8 @@
         <Icon icon="solar:code-2-bold-duotone" size={24} color="var(--text-faint)" />
         <span>Open a file from the Files panel or press <strong>⌘O</strong></span>
       </div>
-    {:else}
-      <div class="cm-container" bind:this={editorEl}></div>
     {/if}
+    <div class="cm-container" hidden={!path} bind:this={editorEl}></div>
   </div>
 </div>
 

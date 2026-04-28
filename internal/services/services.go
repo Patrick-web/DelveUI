@@ -331,6 +331,17 @@ func (s *SessionService) SetBreakpoints(id, sourcePath string, lines []int) (any
 	return resp.Body, nil
 }
 
+// ConfigurationDone signals the DAP server that the client is finished with
+// configuration (e.g. setting breakpoints) so the program can resume.
+// Called by the frontend after start(), once breakpoints have been pushed.
+func (s *SessionService) ConfigurationDone(id string) error {
+	sess := s.mgr.Get(id)
+	if sess == nil {
+		return errors.New("session not found")
+	}
+	return sess.ConfigurationDone()
+}
+
 func (s *SessionService) StackTrace(id string, threadID int) (any, error) {
 	sess := s.mgr.Get(id)
 	if sess == nil || sess.Client() == nil {

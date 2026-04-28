@@ -1,6 +1,6 @@
 import { writable } from "svelte/store";
 
-export type SidebarTabId = "sessions" | "filetree" | "breakpoints";
+export type SidebarTabId = "sessions" | "filetree";
 export type CenterTabId = "source" | "terminal" | "console";
 export type InspectorId = "variables" | "watch" | "callstack" | "threads" | "resources";
 
@@ -11,9 +11,10 @@ export type Layout = {
   sizes: { sidebar: number; inspector: number };
   visible: { sidebar: boolean; inspector: boolean };
   envExpanded: boolean;
+  breakpointsExpanded: boolean;
 };
 
-const STORAGE_KEY = "delveui.layout.v8";
+const STORAGE_KEY = "delveui.layout.v9";
 
 function defaultLayout(): Layout {
   return {
@@ -23,6 +24,7 @@ function defaultLayout(): Layout {
     sizes: { sidebar: 18, inspector: 22 },
     visible: { sidebar: true, inspector: true },
     envExpanded: false,
+    breakpointsExpanded: false,
   };
 }
 
@@ -100,6 +102,16 @@ export function setEnvExpanded(expanded: boolean) {
   layout.update((l) => ({ ...l, envExpanded: expanded }));
 }
 
+// ---- breakpoints drawer ----
+
+export function toggleBreakpointsDrawer() {
+  layout.update((l) => ({ ...l, breakpointsExpanded: !l.breakpointsExpanded }));
+}
+
+export function setBreakpointsExpanded(expanded: boolean) {
+  layout.update((l) => ({ ...l, breakpointsExpanded: expanded }));
+}
+
 // ---- legacy shims — route old panel ids to the right new home ----
 
 const INSPECTOR_IDS: ReadonlySet<InspectorId> = new Set([
@@ -113,7 +125,6 @@ const CENTER_IDS: ReadonlySet<CenterTabId> = new Set(["source", "terminal", "con
 const SIDEBAR_IDS: ReadonlySet<SidebarTabId> = new Set([
   "sessions",
   "filetree",
-  "breakpoints",
 ]);
 
 export function setActivePanel(_which: "left" | "right" | "bottom", panelId: string) {
@@ -124,6 +135,10 @@ export function setActivePanel(_which: "left" | "right" | "bottom", panelId: str
     setCenterActive(panelId as CenterTabId);
   } else if (SIDEBAR_IDS.has(panelId as SidebarTabId)) {
     setSidebarActive(panelId as SidebarTabId);
+    setAreaVisible("sidebar", true);
+  } else if (panelId === "breakpoints") {
+    // Breakpoints lives as a drawer in the sidebar now, not a tab.
+    setBreakpointsExpanded(true);
     setAreaVisible("sidebar", true);
   }
 }

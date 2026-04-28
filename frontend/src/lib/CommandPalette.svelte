@@ -10,8 +10,9 @@
     startSession,
     pickDebugFile,
     cleanDebugBinaries,
+    manualSourcePath,
   } from "./store";
-  import { toggleArea } from "./panels/layout";
+  import { toggleArea, setActivePanel } from "./panels/layout";
   import {
     themeList,
     currentThemeName,
@@ -20,6 +21,7 @@
     loadTheme,
     type ThemeMeta,
   } from "./theme-engine";
+  import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
   import Icon from "./Icon.svelte";
 
   export let open = false;
@@ -33,7 +35,20 @@
   let selected = 0;
   let savedTheme = "";
 
-  type Action = { id: string; label: string; hint?: string; run: () => void };
+  // File search index — populated lazily on first palette open.
+  let projectFiles: string[] = [];
+  let projectFilesRoot = "";
+  let projectFilesLoading = false;
+
+  type ActionKind = "command" | "run" | "theme" | "file";
+  type Action = {
+    id: string;
+    label: string;
+    hint?: string;
+    kind?: ActionKind;
+    detail?: string;
+    run: () => void;
+  };
 
   $: currentList = mode === "commands" ? buildActions()
     : mode === "themes" ? buildThemeList()
@@ -45,7 +60,15 @@
   $: searchHitsRun = mode === "commands" && input.length >= 2
     ? buildRunList().filter((a) => fuzzy(input, a.label))
     : [];
-  $: displayList = mode === "commands" ? [...filtered, ...searchHitsRun] : filtered;
+  // In commands mode, search the project's Go files when the user starts typing.
+  $: searchHitsFiles = mode === "commands" && input.length >= 2
+    ? buildFileList()
+        .filter((a) => fuzzy(input, (a.detail ? a.detail + "/" : "") + a.label))
+        .slice(0, 12)
+    : [];
+  $: displayList = mode === "commands"
+    ? [...filtered, ...searchHitsRun, ...searchHitsFiles]
+    : filtered;
 
   // Live preview: when arrowing through themes, apply the selected one
   $: if (mode === "themes" && filtered.length > 0) {
@@ -112,8 +135,54 @@
         id: "start." + cfg.id,
         label: cfg.label,
         hint: cfg.mode ?? "debug",
+        kind: "run",
         run: () => startSession(cfg.id),
       }));
+  }
+
+  function buildFileList(): Action[] {
+    if (!projectFilesRoot) return [];
+    return projectFiles.map((rel) => {
+      const slash = rel.lastIndexOf("/");
+      const name = slash >= 0 ? rel.slice(slash + 1) : rel;
+      const dir = slash >= 0 ? rel.slice(0, slash) : "";
+      return {
+        id: "file." + rel,
+        label: name,
+        detail: dir,
+        kind: "file" as const,
+        run: () => openFile(rel),
+      };
+    });
+  }
+
+  function openFile(rel: string) {
+    if (!projectFilesRoot) return;
+    manualSourcePath.set(projectFilesRoot + "/" + rel);
+    setActivePanel("right", "source");
+  }
+
+  async function ensureFileIndex() {
+    const root = $workspace?.root ?? "";
+    if (!root) return;
+    if (root === projectFilesRoot && projectFiles.length > 0) return;
+    if (projectFilesLoading) return;
+    projectFilesLoading = true;
+    try {
+      projectFiles = (await FileService.ListGoFiles(root)) as string[] ?? [];
+      projectFilesRoot = root;
+    } catch {
+      projectFiles = [];
+    } finally {
+      projectFilesLoading = false;
+    }
+  }
+
+  // Load the file index the first time the palette opens (and on workspace change).
+  $: if (open) ensureFileIndex();
+  $: if (($workspace?.root ?? "") !== projectFilesRoot) {
+    projectFiles = [];
+    projectFilesRoot = "";
   }
 
   function enterRunMode() {
@@ -320,10 +389,15 @@
         >
           {#if mode === "themes"}
             <span class="theme-dot" class:active={a.id === $currentThemeName}>●</span>
-          {:else if mode === "run"}
+          {:else if mode === "run" || a.kind === "run"}
             <Icon icon="solar:play-bold" size={12} color="var(--success)" />
+          {:else if a.kind === "file"}
+            <Icon icon="solar:code-bold" size={12} color="var(--info)" />
           {/if}
           <span class="label">{a.label}</span>
+          {#if a.detail}
+            <span class="detail">{a.detail}</span>
+          {/if}
           {#if a.hint}
             <span class="hint">{a.hint}</span>
           {/if}
@@ -406,6 +480,15 @@
     color: var(--text-faint);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
+  }
+  .detail {
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 240px;
   }
   .theme-dot {
     color: var(--text-faint);

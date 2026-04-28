@@ -57,6 +57,7 @@ export type WorkspaceInfo = {
 
 export type SessionEvent = {
   sessionId: string;
+  cfgId?: string;
   kind: string;
   state?: string;
   output?: string;
@@ -202,6 +203,7 @@ export async function restartSession(id: string) {
       sessions.update((m) => ({ ...m, [s.id]: s }));
       activeSessionId.set(s.id);
       ensureSession(s.id);
+      sendBreakpointsToSession(s.id).catch(() => {});
       import("./panels/layout").then(({ setActivePanel }) => {
         setActivePanel("right", "terminal");
       });
@@ -291,7 +293,10 @@ export async function setBreakpoints(
   }
 }
 
-// Send all global breakpoints to a session (called on session start)
+// Send all global breakpoints to a session (called on session start),
+// then signal configurationDone so dlv resumes execution. The DAP spec
+// requires this ordering — breakpoints set after configurationDone won't
+// fire on code that has already executed.
 export async function sendBreakpointsToSession(sessionId: string) {
   const bps = get(globalBreakpoints);
   for (const [sourcePath, lines] of Object.entries(bps)) {
@@ -305,6 +310,11 @@ export async function sendBreakpointsToSession(sessionId: string) {
         });
       } catch {}
     }
+  }
+  try {
+    await SessionService.ConfigurationDone(sessionId);
+  } catch (e) {
+    console.error("ConfigurationDone failed:", e);
   }
 }
 
@@ -357,13 +367,22 @@ Events.On("session:event", wrapHandler("session:event", async (ev: any) => {
   console.debug("[session:event]", e);
   ensureSession(e.sessionId);
   // Auto-register a placeholder session so panes have something to display
+  // before SessionService.Start() resolves. The event carries cfgId so we
+  // can look up the proper label and let the Run picker hide the launching
+  // config — avoids a brief "(unknown)" row alongside the still-clickable cfg.
   sessions.update((m) => {
     if (!m[e.sessionId]) {
+      const cfgId = e.cfgId ?? "";
+      const ws = get(workspace);
+      const cfg = cfgId ? ws?.configs?.find((c) => c.id === cfgId) : undefined;
+      // If we can't resolve a cfg, skip the placeholder. Start() will
+      // register the real session shortly; better empty than "(unknown)".
+      if (!cfg) return m;
       m[e.sessionId] = {
         id: e.sessionId,
-        cfgId: "",
-        label: "(unknown)",
-        state: e.state ?? "idle",
+        cfgId,
+        label: cfg.label,
+        state: e.state ?? "starting",
         port: 0,
         pid: 0,
       };
