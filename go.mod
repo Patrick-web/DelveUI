@@ -4,9 +4,11 @@ go 1.25
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/google/go-dap v0.12.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd
 	github.com/wailsapp/wails/v3 v3.0.0-alpha.74
 )

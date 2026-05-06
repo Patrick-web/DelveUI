@@ -1,0 +1,37 @@
+{
+  "name": "Gruvbox Dark Hard",
+  "author": "morhetz (Gruvbox)",
+  "appearance": "dark",
+  "style": {
+    "bg": "#1d2021",
+    "bgElevated": "#3c3836",
+    "bgSubtle": "#141617",
+    "surface": "#282828",
+    "text": "#fbf1c7",
+    "textMuted": "#ebdbb2",
+    "textFaint": "#928374",
+    "border": "#504945",
+    "borderSubtle": "#3c3836",
+    "accent": "#83a598",
+    "accentSubtle": "rgba(131,165,152,0.15)",
+    "danger": "#fb4934",
+    "warning": "#fabd2f",
+    "success": "#b8bb26",
+    "info": "#83a598",
+    "synKeyword": "#d3869b",
+    "synString": "#b8bb26",
+    "synNumber": "#fe8019",
+    "synFn": "#83a598",
+    "synComment": "#928374",
+    "terminal": {
+      "black": "#1d2021", "red": "#fb4934", "green": "#b8bb26",
+      "yellow": "#fabd2f", "blue": "#83a598", "magenta": "#d3869b",
+      "cyan": "#8ec07c", "white": "#fbf1c7",
+      "brightBlack": "#928374", "brightRed": "#fb4934",
+      "brightGreen": "#b8bb26", "brightYellow": "#fabd2f",
+      "brightBlue": "#83a598", "brightMagenta": "#d3869b",
+      "brightCyan": "#8ec07c", "brightWhite": "#fbf1c7",
+      "background": "#1d2021", "foreground": "#fbf1c7", "cursor": "#fe8019"
+    }
+  }
+}

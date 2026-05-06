@@ -308,7 +308,8 @@ export async function control(
   await (SessionService as any)[action](id);
 }
 
-// --- Discovery: auto-discovered run/test/attach targets ---
+// --- Discovery: targets discovered inside the opened workspace folder.
+// Scoped to $workspace.root only — never a system-wide scan.
 
 export type RunTarget = {
   id: string;
@@ -372,14 +373,11 @@ function registerLaunchedSession(result: any, errorTitle: string) {
   };
   sessions.update((m) => ({ ...m, [sid]: info }));
   activeSessionId.set(sid);
-  // ensureSession is only called from the session:event handler normally; do
-  // it here so panes that depend on per-session state can render right away.
   sessionState.update((m) => {
     if (!m[sid]) m[sid] = { output: [], stack: [], stoppedThread: 0, breakpoints: {} };
     return m;
   });
   sendBreakpointsToSession(sid).catch(() => {});
-  // Switch to terminal so output is visible.
   import("./panels/layout").then(({ setActivePanel }) => {
     setActivePanel("right", "terminal");
   });

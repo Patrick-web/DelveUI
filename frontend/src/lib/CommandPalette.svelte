@@ -26,7 +26,6 @@
 
   export let open = false;
   export let onOpenSettings: () => void = () => {};
-  export let onOpenImport: () => void = () => {};
   export let onOpenFile: () => void = () => {};
 
   type Mode = "commands" | "themes" | "run";
@@ -102,11 +101,6 @@
         run: () => pickDebugFile(),
       },
       {
-        id: "debugfiles.detect",
-        label: "Debug Files: Auto-detect configs…",
-        run: () => onOpenImport(),
-      },
-      {
         id: "debug.cleanBinaries",
         label: "Debug: Clean debug binaries",
         run: () => cleanDebugBinaries(),
@@ -169,7 +163,7 @@
     if (projectFilesLoading) return;
     projectFilesLoading = true;
     try {
-      projectFiles = (await FileService.ListGoFiles(root)) as string[] ?? [];
+      projectFiles = (await FileService.ListAllFiles(root)) as string[] ?? [];
       projectFilesRoot = root;
     } catch {
       projectFiles = [];

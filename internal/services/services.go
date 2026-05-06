@@ -635,6 +635,42 @@ func (f *FileService) ListGoFiles(root string) ([]string, error) {
 	return results, nil
 }
 
+// ListAllFiles walks the workspace returning every non-hidden file (not just
+// Go source) for VS-Code-style file pickers. Skips dotfiles, vendored deps,
+// build artefacts, and other directories users typically don't want surfaced
+// in fuzzy search.
+func (f *FileService) ListAllFiles(root string) ([]string, error) {
+	var results []string
+	count := 0
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return filepath.SkipDir
+		}
+		if d.IsDir() {
+			if hiddenDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// Skip dotfiles at the file level too (e.g. .DS_Store) since users
+		// generally don't search for them.
+		if strings.HasPrefix(d.Name(), ".") {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, path)
+		results = append(results, rel)
+		count++
+		if count >= 20000 {
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if err != nil && err != filepath.SkipAll {
+		return results, err
+	}
+	return results, nil
+}
+
 func (f *FileService) ReadFile(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

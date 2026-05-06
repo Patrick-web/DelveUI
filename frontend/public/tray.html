@@ -322,7 +322,7 @@
       }
       debugH.style.display = availableCfgs.length > 0 ? "" : "none";
 
-      // run targets (not currently running)
+      // run targets discovered inside the opened workspace folder
       const targets = await fetchTargets(hasWorkspace);
       const availableTargets = (targets || [])
         .filter(t => !runningCfgIds.has(t.id))
@@ -338,7 +338,6 @@
       }
       runH.style.display = availableTargets.length > 0 ? "" : "none";
 
-      // hide whole section if both lists empty
       launchSection.style.display =
         availableCfgs.length > 0 || availableTargets.length > 0 ? "" : "none";
     }

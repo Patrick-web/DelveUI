@@ -1,6 +1,6 @@
 import { writable } from "svelte/store";
 
-export type SidebarTabId = "sessions" | "debug" | "run" | "filetree";
+export type SidebarTabId = "sessions" | "debug" | "run" | "filetree" | "search";
 export type CenterTabId = "source" | "terminal" | "console";
 export type InspectorId = "variables" | "watch" | "callstack" | "threads" | "resources";
 
@@ -127,6 +127,7 @@ const SIDEBAR_IDS: ReadonlySet<SidebarTabId> = new Set([
   "debug",
   "run",
   "filetree",
+  "search",
 ]);
 
 export function setActivePanel(_which: "left" | "right" | "bottom", panelId: string) {

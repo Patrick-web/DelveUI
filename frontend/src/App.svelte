@@ -9,7 +9,6 @@
     refreshWorkspace,
     refreshSessions,
     pickDebugFile,
-    startSession,
     stopSession,
     restartSession,
     control,
@@ -20,27 +19,22 @@
   import StatusBar from "./lib/StatusBar.svelte";
   import CommandPalette from "./lib/CommandPalette.svelte";
   import SettingsPage from "./lib/SettingsPage.svelte";
+  // ImportWizard removed: editor auto-detection retired in favor of explicit
+  // file/folder picks (see ProjectSwitcher / WelcomePage).
   import Toast from "./lib/Toast.svelte";
-  import ImportWizard from "./lib/ImportWizard.svelte";
   import WelcomePage from "./lib/WelcomePage.svelte";
   import ConfigPicker from "./lib/ConfigPicker.svelte";
   import QuickOpen from "./lib/QuickOpen.svelte";
   import Icon from "./lib/Icon.svelte";
   import ProjectSwitcher from "./lib/ProjectSwitcher.svelte";
-  import { layout, setAreaSize, toggleArea } from "./lib/panels/layout";
+  import RunPalette from "./lib/RunPalette.svelte";
+  import { layout, setAreaSize, toggleArea, setSidebarActive, setAreaVisible } from "./lib/panels/layout";
   import { startMainThreadProbe } from "./lib/diagnostics";
+  import { initSearchEvents } from "./lib/search-store";
 
-  let cfgPickerOpen = false;
-  let runPickerEl: HTMLDivElement;
-
-  function onWindowClick(e: MouseEvent) {
-    if (!cfgPickerOpen) return;
-    const t = e.target as Node;
-    if (runPickerEl && !runPickerEl.contains(t)) cfgPickerOpen = false;
-  }
+  let runPaletteOpen = false;
   let paletteOpen = false;
   let settingsOpen = false;
-  let importWizardOpen = false;
   let configPickerOpen = false;
   let quickOpenOpen = false;
   let showWelcome = false;
@@ -63,6 +57,7 @@
     });
 
     window.addEventListener("keydown", onLayoutKey);
+    initSearchEvents();
     await refreshWorkspace();
     await refreshSessions();
     const list = Object.values($sessions);
@@ -96,17 +91,15 @@
       toggleArea("inspector");
       return;
     }
+    // Cmd+Shift+F → reveal Search sidebar tab and focus the query input.
+    if (e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+      e.preventDefault();
+      setAreaVisible("sidebar", true);
+      setSidebarActive("search");
+      return;
+    }
   }
 
-  $: sessionList = Object.values($sessions);
-  $: availableCfgs = ($workspace?.configs ?? []).filter(
-    (c: any) => !c.disabled && !sessionList.some((s) => s.cfgId === c.id),
-  );
-
-  async function startFromPicker(cfgId: string) {
-    cfgPickerOpen = false;
-    await startSession(cfgId);
-  }
 
   async function onToolbarDblClick(e: MouseEvent) {
     // Only zoom if the click landed on the drag region itself, not on an
@@ -140,14 +133,12 @@
 <CommandPalette
   bind:open={paletteOpen}
   onOpenSettings={() => (settingsOpen = true)}
-  onOpenImport={() => (importWizardOpen = true)}
   onOpenFile={() => (quickOpenOpen = true)}
 />
-<SettingsPage bind:open={settingsOpen} onOpenImport={() => (importWizardOpen = true)} />
-<ImportWizard bind:open={importWizardOpen} />
-<ConfigPicker bind:open={configPickerOpen} onOpenImport={() => (importWizardOpen = true)} />
+<SettingsPage bind:open={settingsOpen} />
+<ConfigPicker bind:open={configPickerOpen} />
 <QuickOpen bind:open={quickOpenOpen} />
-<svelte:window on:click={onWindowClick} />
+<RunPalette bind:open={runPaletteOpen} />
 
 <WelcomePage visible={showWelcome} onDone={() => { showWelcome = false; refreshWorkspace(); }} />
 <Toast />
@@ -200,28 +191,10 @@
         <Icon icon="solar:settings-linear" size={14} />
       </button>
 
-      <div class="run-picker" bind:this={runPickerEl}>
-        <button class="tb-pill primary" on:click={() => (cfgPickerOpen = !cfgPickerOpen)}>
-          <Icon icon="solar:play-bold" size={12} />
-          Run
-          <Icon icon="solar:alt-arrow-down-linear" size={10} />
-        </button>
-        {#if cfgPickerOpen}
-          <div class="dd">
-            {#if availableCfgs.length === 0}
-              <div class="dd-empty">
-                {($workspace?.configs?.length ?? 0) > 0 ? "All configs are running" : "Open a project first"}
-              </div>
-            {/if}
-            {#each availableCfgs as cfg}
-              <button class="dd-item" on:click={() => startFromPicker(cfg.id)}>
-                <Icon icon="solar:play-bold" size={12} color="var(--success)" />
-                <span>{cfg.label}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
+      <button class="tb-pill primary" on:click={() => (runPaletteOpen = true)}>
+        <Icon icon="solar:play-bold" size={12} />
+        Run
+      </button>
     </div>
   </div>
 
@@ -235,7 +208,7 @@
       {/if}
 
       <Pane minSize={30}>
-        <CenterPanel onOpenImport={() => (importWizardOpen = true)} />
+        <CenterPanel />
       </Pane>
 
       {#if $layout.visible.inspector}
@@ -308,11 +281,10 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    height: 26px;
-    padding: 0 10px 0 10px;
+    padding: 4px 10px 4px 10px;
     background: var(--bg);
     border: 1px solid var(--border-subtle);
-    border-radius: 6px;
+    border-radius: 20px;
     color: var(--text-muted);
     font: inherit;
     font-size: var(--text-sm);
@@ -361,42 +333,6 @@
   /* The segmented step-control group is also interactive. */
   .step-controls { --wails-draggable: no-drag; }
   .step-controls .seg { width: 28px; padding: 0; }
-
-  .run-picker { position: relative; }
-  .dd {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    min-width: 280px;
-    z-index: 100;
-    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
-    padding: 4px;
-    max-height: 320px;
-    overflow: auto;
-  }
-  .dd-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    background: transparent;
-    border: 0;
-    padding: 7px 10px;
-    color: var(--text);
-    font-size: var(--text-sm);
-    text-align: left;
-    cursor: pointer;
-    border-radius: 5px;
-  }
-  .dd-item:hover { background: var(--accent); color: #fff; }
-  .dd-empty {
-    padding: 10px 12px;
-    color: var(--text-faint);
-    font-size: var(--text-sm);
-  }
 
   .workspace {
     flex: 1;

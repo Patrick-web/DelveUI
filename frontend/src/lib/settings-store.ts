@@ -2,10 +2,19 @@ import { writable } from "svelte/store";
 import * as SettingsService from "../../bindings/github.com/jp/DelveUI/internal/settings/service";
 import * as DebugFilesStore from "../../bindings/github.com/jp/DelveUI/internal/debugfiles/store";
 
+export type VimMappingMode = "normal" | "visual" | "insert";
+
+export type VimMapping = {
+  lhs: string;
+  rhs: string;
+  mode: VimMappingMode;
+};
+
 export type AppSettings = {
   theme: string;
   terminalTheme: string;
   vimMode: boolean;
+  vimMappings: VimMapping[];
   uiFontSize: number;
   bufferFontSize: number;
   termFontSize: number;
@@ -42,6 +51,7 @@ export const appSettings = writable<AppSettings>({
   theme: "One Dark",
   terminalTheme: "follow",
   vimMode: false,
+  vimMappings: [],
   uiFontSize: 13,
   bufferFontSize: 13,
   termFontSize: 12,
@@ -58,6 +68,7 @@ export const debugFiles = writable<DebugFileEntry[]>([]);
 export async function loadSettings() {
   try {
     const s = (await SettingsService.Get()) as any as AppSettings;
+    if (!Array.isArray(s.vimMappings)) s.vimMappings = [];
     appSettings.set(s);
     applyFontSettingsGlobal(s);
   } catch (e) {

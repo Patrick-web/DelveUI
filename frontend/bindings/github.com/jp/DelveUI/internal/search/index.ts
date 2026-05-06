@@ -7,6 +7,5 @@ export {
 };
 
 export {
-    Settings,
-    VimMapping
+    Request
 } from "./models.js";

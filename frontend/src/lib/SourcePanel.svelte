@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onDestroy, tick } from "svelte";
-  import { EditorView, gutter, GutterMarker, lineNumbers, highlightActiveLine, keymap, Decoration, type DecorationSet } from "@codemirror/view";
+  import { EditorView, gutter, GutterMarker, lineNumbers, highlightActiveLine, keymap, Decoration, drawSelection, type DecorationSet } from "@codemirror/view";
   import { EditorState, StateField, StateEffect, RangeSet, Compartment } from "@codemirror/state";
   import { go } from "@codemirror/lang-go";
   import { editorTheme, editorHighlighting } from "./editor-theme";
   import { vim, Vim } from "@replit/codemirror-vim";
   import { search, openSearchPanel, searchKeymap } from "@codemirror/search";
-  import { defaultKeymap } from "@codemirror/commands";
+  import { history, historyKeymap } from "@codemirror/commands";
   import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, scrollToLineRequest, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes, workspace } from "./store";
   import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
   import { showInfo, showError } from "./toast";
@@ -20,6 +20,10 @@
   let view: EditorView | null = null;
   let loadedPath = "";
   let dirty = false;
+  // Snapshot of the on-disk document so undoing back to the start clears the
+  // dirty marker. Compared via Text.eq, which is O(min(n, leaf)) and short-
+  // circuits on length mismatch.
+  let savedDoc: import("@codemirror/state").Text | null = null;
 
   $: framePath = $selectedFrame?.source?.path ?? "";
   $: path = $manualSourcePath || framePath;
@@ -64,6 +68,7 @@
     const content = view.state.doc.toString();
     try {
       await FileService.WriteFile(path, content);
+      savedDoc = view.state.doc;
       dirty = false;
       showInfo("Saved", shortPath(path));
     } catch (e: any) {
@@ -187,6 +192,14 @@
     Vim.defineEx("write", "w", () => { saveFile(); });
     Vim.defineEx("quit", "q", () => { /* no-op, can't close panel */ });
     Vim.defineEx("wq", "wq", () => { saveFile(); });
+    // Route yank through the system clipboard. The "+" register is bound to
+    // navigator.clipboard by @replit/codemirror-vim. Must use noremap or the
+    // recursive expansion of y → "+y → "+y → … never reaches the operator.
+    Vim.noremap("y", '"+y', "normal");
+    Vim.noremap("Y", '"+Y', "normal");
+    Vim.noremap("y", '"+y', "visual");
+    Vim.noremap("p", '"+p', "normal");
+    Vim.noremap("P", '"+P', "normal");
   }
 
   // --- Vim + Search ---
@@ -194,6 +207,28 @@
   $: vimEnabled = $appSettings.vimMode ?? false;
   $: if (view) {
     view.dispatch({ effects: vimCompartment.reconfigure(vimEnabled ? vim() : []) });
+  }
+
+  // Replay user-defined vim mappings whenever the settings change. Vim.map is
+  // global, so we unmap the prior set first to avoid stale bindings sticking
+  // around after the user edits or removes a row in Settings.
+  let lastAppliedMappings: { lhs: string; mode: string }[] = [];
+  $: applyUserMappings($appSettings.vimMappings ?? []);
+  function applyUserMappings(mappings: { lhs: string; rhs: string; mode: string }[]) {
+    for (const m of lastAppliedMappings) {
+      try { (Vim as any).unmap(m.lhs, m.mode); } catch {}
+    }
+    const applied: { lhs: string; mode: string }[] = [];
+    for (const m of mappings) {
+      if (!m.lhs || !m.rhs) continue;
+      try {
+        Vim.map(m.lhs, m.rhs, m.mode);
+        applied.push({ lhs: m.lhs, mode: m.mode });
+      } catch (e) {
+        console.warn("vim map failed:", m, e);
+      }
+    }
+    lastAppliedMappings = applied;
   }
 
   // --- Editor creation ---
@@ -208,6 +243,9 @@
 
     const extensions = [
       vimCompartment.of(vimEnabled ? vim() : []),
+      drawSelection(),
+      EditorState.allowMultipleSelections.of(true),
+      history(),
       go(),
       editorTheme,
       editorHighlighting,
@@ -216,7 +254,9 @@
         run: () => { saveFile(); return true; },
       }]),
       EditorView.updateListener.of((u) => {
-        if (u.docChanged) dirty = true;
+        if (u.docChanged) {
+          dirty = savedDoc ? !u.state.doc.eq(savedDoc) : true;
+        }
         if (u.docChanged || u.selectionSet) scheduleSymbolRefresh();
       }),
       lineNumbers({
@@ -235,6 +275,7 @@
       highlightActiveLine(),
       search({ top: true }),
       keymap.of(searchKeymap),
+      keymap.of(historyKeymap),
       breakpointGutter,
       breakpointState,
       currentLineField,
@@ -308,6 +349,7 @@
       parent: editorEl,
       state: EditorState.create({ doc: text, extensions }),
     });
+    savedDoc = view.state.doc;
 
     registerVimCommands();
 

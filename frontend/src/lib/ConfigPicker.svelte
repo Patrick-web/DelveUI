@@ -14,7 +14,6 @@
   } from "./store";
 
   export let open = false;
-  export let onOpenImport: () => void = () => {};
 
   let selected = 0;
 
@@ -109,9 +108,6 @@
     <div class="footer">
       <button class="btn outlined" on:click={addNew}>
         <Icon icon="solar:add-circle-bold" size={12} /> Add debug.json
-      </button>
-      <button class="btn outlined" on:click={() => { close(); onOpenImport(); }}>
-        <Icon icon="solar:magnifer-bold" size={12} /> Auto-detect
       </button>
     </div>
   </div>

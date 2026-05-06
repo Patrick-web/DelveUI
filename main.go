@@ -17,6 +17,7 @@ import (
 	"github.com/jp/DelveUI/internal/detect"
 	"github.com/jp/DelveUI/internal/discovery"
 	"github.com/jp/DelveUI/internal/discovery/goprovider"
+	"github.com/jp/DelveUI/internal/search"
 	"github.com/jp/DelveUI/internal/services"
 	"github.com/jp/DelveUI/internal/session"
 	"github.com/jp/DelveUI/internal/settings"
@@ -66,6 +67,7 @@ func main() {
 	wsSvc := services.NewWorkspaceService(dbgFiles)
 	sessSvc := services.NewSessionService(mgr, wsSvc)
 	fileSvc := services.NewFileService()
+	searchSvc := search.New(wsSvc)
 
 	// Discovery: pluggable run/test/attach target detection. Providers register
 	// themselves explicitly here so the import graph stays self-documenting —
@@ -109,6 +111,7 @@ func main() {
 			application.NewService(updateSvc),
 			application.NewService(detectSvc),
 			application.NewService(discoverySvc),
+			application.NewService(searchSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -142,6 +145,7 @@ func main() {
 	detectSvc.SetApp(app)
 	discoverySvc.SetApp(app)
 	updateSvc.SetApp(app)
+	searchSvc.SetApp(app)
 
 	trayCtrl := tray.New(app, win, wsSvc, sessSvc, mgr)
 

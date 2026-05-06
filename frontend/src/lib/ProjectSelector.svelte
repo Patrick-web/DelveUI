@@ -1,10 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { debugFiles, loadDebugFiles, type DebugFileEntry } from "./settings-store";
-  import { openDebugFile, pickDebugFile, refreshWorkspace } from "./store";
+  import { openDebugFile, pickDebugFile, pickWorkspaceFolder, refreshWorkspace, refreshTargets } from "./store";
   import Icon from "./Icon.svelte";
-
-  export let onOpenImport: () => void = () => {};
 
   let loading = true;
 
@@ -26,11 +24,19 @@
   async function openFile(entry: DebugFileEntry) {
     await openDebugFile(entry.path);
     await refreshWorkspace();
+    refreshTargets().catch(() => {});
   }
 
   async function pickNew() {
     await pickDebugFile();
     await refreshWorkspace();
+    refreshTargets().catch(() => {});
+  }
+
+  async function pickFolder() {
+    await pickWorkspaceFolder();
+    await refreshWorkspace();
+    refreshTargets().catch(() => {});
   }
 
   $: entries = $debugFiles ?? [];
@@ -49,7 +55,7 @@
       <div>
         <h1>Choose a project</h1>
         <p class="subtitle">
-          Pick a registered <code>debug.json</code> to load, or add a new one.
+          Open a folder or point at a <code>debug.json</code> / <code>launch.json</code>.
         </p>
       </div>
     </div>
@@ -61,8 +67,8 @@
     {:else if sorted.length === 0}
       <div class="empty">
         <Icon icon="solar:inbox-bold" size={24} color="var(--text-faint)" />
-        <span>No projects registered yet.</span>
-        <span class="sub">Open an existing <code>debug.json</code> or auto-detect from your editors.</span>
+        <span>No projects yet.</span>
+        <span class="sub">Open a folder or pick a <code>debug.json</code> / <code>launch.json</code> to get started.</span>
       </div>
     {:else}
       <ul class="list">
@@ -94,13 +100,13 @@
     {/if}
 
     <div class="actions">
-      <button class="pill primary" on:click={pickNew}>
-        <Icon icon="solar:add-circle-bold" size={13} />
-        Open debug.json…
+      <button class="pill primary" on:click={pickFolder}>
+        <Icon icon="solar:folder-with-files-bold" size={13} />
+        Open folder…
       </button>
-      <button class="pill" on:click={onOpenImport}>
-        <Icon icon="solar:magnifer-bold" size={13} />
-        Auto-detect from editors
+      <button class="pill" on:click={pickNew}>
+        <Icon icon="solar:document-add-bold" size={13} />
+        Open debug.json…
       </button>
     </div>
   </div>

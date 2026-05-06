@@ -7,15 +7,22 @@ import (
 	"sync"
 )
 
+type VimMapping struct {
+	Lhs  string `json:"lhs"`
+	Rhs  string `json:"rhs"`
+	Mode string `json:"mode"` // "normal" | "visual" | "insert"
+}
+
 type Settings struct {
-	Theme          string `json:"theme"`
-	TerminalTheme  string `json:"terminalTheme"`
-	VimMode        bool   `json:"vimMode"`
-	UIFontSize     int    `json:"uiFontSize"`
-	BufferFontSize int    `json:"bufferFontSize"`
-	TermFontSize   int    `json:"termFontSize"`
-	LineHeight     string `json:"lineHeight"`
-	DlvPath        string `json:"dlvPath"`
+	Theme          string       `json:"theme"`
+	TerminalTheme  string       `json:"terminalTheme"`
+	VimMode        bool         `json:"vimMode"`
+	VimMappings    []VimMapping `json:"vimMappings"`
+	UIFontSize     int          `json:"uiFontSize"`
+	BufferFontSize int          `json:"bufferFontSize"`
+	TermFontSize   int          `json:"termFontSize"`
+	LineHeight     string       `json:"lineHeight"`
+	DlvPath        string       `json:"dlvPath"`
 
 	// RestoreLastProject controls the auto-open behavior on launch. When true,
 	// the most-recently-active project is reopened. When false, the user lands
@@ -95,6 +102,9 @@ func (s *Service) applyDefaults() {
 	if s.data.RestoreLastProject == nil {
 		t := true
 		s.data.RestoreLastProject = &t
+	}
+	if s.data.VimMappings == nil {
+		s.data.VimMappings = []VimMapping{}
 	}
 }
 

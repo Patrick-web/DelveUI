@@ -18,7 +18,7 @@
     root = $workspace?.root ?? "";
     if (!root) return;
     try {
-      files = (await FileService.ListGoFiles(root)) as string[] ?? [];
+      files = (await FileService.ListAllFiles(root)) as string[] ?? [];
       loaded = true;
     } catch { files = []; }
   }

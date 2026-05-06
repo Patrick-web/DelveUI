@@ -9,6 +9,7 @@ export class Settings {
     "theme": string;
     "terminalTheme": string;
     "vimMode": boolean;
+    "vimMappings": VimMapping[];
     "uiFontSize": number;
     "bufferFontSize": number;
     "termFontSize": number;
@@ -36,6 +37,9 @@ export class Settings {
         }
         if (!("vimMode" in $$source)) {
             this["vimMode"] = false;
+        }
+        if (!("vimMappings" in $$source)) {
+            this["vimMappings"] = [];
         }
         if (!("uiFontSize" in $$source)) {
             this["uiFontSize"] = 0;
@@ -72,18 +76,57 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField9_0 = $$createType0;
-        const $$createField10_0 = $$createType0;
+        const $$createField3_0 = $$createType1;
+        const $$createField10_0 = $$createType2;
+        const $$createField11_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("vimMappings" in $$parsedSource) {
+            $$parsedSource["vimMappings"] = $$createField3_0($$parsedSource["vimMappings"]);
+        }
         if ("leftPanels" in $$parsedSource) {
-            $$parsedSource["leftPanels"] = $$createField9_0($$parsedSource["leftPanels"]);
+            $$parsedSource["leftPanels"] = $$createField10_0($$parsedSource["leftPanels"]);
         }
         if ("rightPanels" in $$parsedSource) {
-            $$parsedSource["rightPanels"] = $$createField10_0($$parsedSource["rightPanels"]);
+            $$parsedSource["rightPanels"] = $$createField11_0($$parsedSource["rightPanels"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
 
+export class VimMapping {
+    "lhs": string;
+    "rhs": string;
+
+    /**
+     * "normal" | "visual" | "insert"
+     */
+    "mode": string;
+
+    /** Creates a new VimMapping instance. */
+    constructor($$source: Partial<VimMapping> = {}) {
+        if (!("lhs" in $$source)) {
+            this["lhs"] = "";
+        }
+        if (!("rhs" in $$source)) {
+            this["rhs"] = "";
+        }
+        if (!("mode" in $$source)) {
+            this["mode"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new VimMapping instance from a string or object.
+     */
+    static createFrom($$source: any = {}): VimMapping {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new VimMapping($$parsedSource as Partial<VimMapping>);
+    }
+}
+
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
+const $$createType0 = VimMapping.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = $Create.Array($Create.Any);

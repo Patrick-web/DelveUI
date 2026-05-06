@@ -14,15 +14,27 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+/**
+ * ListAllFiles walks the workspace returning every non-hidden file (not just
+ * Go source) for VS-Code-style file pickers. Skips dotfiles, vendored deps,
+ * build artefacts, and other directories users typically don't want surfaced
+ * in fuzzy search.
+ */
+export function ListAllFiles(root: string): $CancellablePromise<string[]> {
+    return $Call.ByID(456017913, root).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
 export function ListDir(dirPath: string): $CancellablePromise<$models.DirEntry[]> {
     return $Call.ByID(1748364066, dirPath).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
 export function ListGoFiles(root: string): $CancellablePromise<string[]> {
     return $Call.ByID(721462788, root).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType0($result);
     });
 }
 
@@ -35,6 +47,6 @@ export function WriteFile(path: string, content: string): $CancellablePromise<vo
 }
 
 // Private type creation functions
-const $$createType0 = $models.DirEntry.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $Create.Array($Create.Any);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = $models.DirEntry.createFrom;
+const $$createType2 = $Create.Array($$createType1);

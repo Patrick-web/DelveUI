@@ -13,6 +13,8 @@
     reloadDebugFile,
     type AppSettings,
     type DebugFileEntry,
+    type VimMapping,
+    type VimMappingMode,
   } from "./settings-store";
   import {
     themeList,
@@ -23,7 +25,7 @@
     previewThemeByName,
     revertThemePreview,
   } from "./theme-engine";
-  import { pickDebugFile, refreshWorkspace, openDebugFile, workspace } from "./store";
+  import { pickDebugFile, pickWorkspaceFolder, refreshWorkspace, openDebugFile, workspace } from "./store";
   import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
   import { showInfo, showError } from "./toast";
   import * as UpdateService from "../../bindings/github.com/jp/DelveUI/internal/updater/service";
@@ -116,14 +118,14 @@
   import * as DebugFilesStoreBinding from "../../bindings/github.com/jp/DelveUI/internal/debugfiles/store";
 
   export let open = false;
-  export let onOpenImport: () => void = () => {};
 
-  type Tab = "appearance" | "terminal" | "debugfiles" | "general";
-  const allTabs: Tab[] = ["appearance", "terminal", "debugfiles", "general"];
+  type Tab = "appearance" | "terminal" | "debugfiles" | "vim" | "general";
+  const allTabs: Tab[] = ["appearance", "terminal", "debugfiles", "vim", "general"];
   const tabIcons: Record<Tab, string> = {
     appearance: "solar:palette-bold",
     terminal: "solar:monitor-bold",
     debugfiles: "solar:document-bold",
+    vim: "solar:keyboard-bold",
     general: "solar:settings-bold",
   };
 
@@ -133,12 +135,70 @@
     appearance: "Appearance",
     terminal: "Terminal",
     debugfiles: "Debug Files",
+    vim: "Vim",
     general: "General",
   };
 
+  // Cross-tab search index. Each entry's `id` matches an `id` attribute on
+  // a card in the template — that's how clicking a result jumps straight to
+  // the relevant section instead of dumping the user on a tab.
+  type SearchEntry = {
+    id: string;
+    label: string;
+    description?: string;
+    keywords?: string;
+    tab: Tab;
+  };
+  const searchIndex: SearchEntry[] = [
+    { id: "appearance-theme", label: "Theme", keywords: "color dark light appearance palette", tab: "appearance" },
+    { id: "appearance-font-sizes", label: "Font Sizes", description: "UI and editor font size", keywords: "font size ui editor buffer text", tab: "appearance" },
+    { id: "appearance-line-height", label: "Line Height", keywords: "spacing density compact comfortable standard", tab: "appearance" },
+    { id: "terminal-font", label: "Terminal Font Size", keywords: "font size text", tab: "terminal" },
+    { id: "terminal-theme", label: "Terminal Theme", keywords: "color follow editor", tab: "terminal" },
+    { id: "debugfiles-projects", label: "Projects", description: "Registered folders and debug files", keywords: "folder workspace project import open debug launch json file", tab: "debugfiles" },
+    { id: "general-toggles", label: "Restore last project on launch", description: "Reopen the most recent project at startup", keywords: "startup autoload reopen launch session", tab: "general" },
+    { id: "vim-toggle", label: "Vim Mode", description: "Vim keybindings in the source editor", keywords: "vi keybindings editor modal", tab: "vim" },
+    { id: "vim-mappings", label: "Vim Custom Mappings", description: "Define your own vim key mappings", keywords: "vim map remap keybinding lhs rhs normal visual insert", tab: "vim" },
+    { id: "vim-cheatsheet", label: "Vim Cheat Sheet", description: "Reference of common vim bindings", keywords: "vim cheat reference motion editing visual search", tab: "vim" },
+    { id: "general-shortcuts", label: "Keyboard Shortcuts", keywords: "keybindings hotkeys keys palette command", tab: "general" },
+    { id: "general-updates", label: "Updates", description: "Check for and install new versions", keywords: "update version upgrade release download", tab: "general" },
+    { id: "general-about", label: "About", keywords: "version info build", tab: "general" },
+    { id: "general-reset", label: "Reset", description: "Clear settings, debug files, or factory reset", keywords: "clear factory reset settings everything", tab: "general" },
+  ];
+
+  function matchesQuery(q: string, hay: string): boolean {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return true;
+    const text = hay.toLowerCase();
+    return needle.split(/\s+/).every((w) => text.includes(w));
+  }
+
+  $: searchActive = searchQuery.trim().length > 0;
+  $: searchResults = searchActive
+    ? searchIndex.filter((e) =>
+        matchesQuery(
+          searchQuery,
+          [e.label, e.description ?? "", e.keywords ?? "", tabLabels[e.tab]].join(" "),
+        ),
+      )
+    : [];
+
+  function gotoSearchResult(e: SearchEntry) {
+    tab = e.tab;
+    searchQuery = "";
+    // Wait for the tab content to render before scrolling.
+    setTimeout(() => {
+      const el = document.getElementById(e.id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.classList.add("flash-highlight");
+      setTimeout(() => el.classList.remove("flash-highlight"), 1400);
+    }, 30);
+  }
+
   let tab: Tab = "appearance";
   let settings: AppSettings = {
-    theme: "One Dark", terminalTheme: "follow", vimMode: false,
+    theme: "One Dark", terminalTheme: "follow", vimMode: false, vimMappings: [],
     uiFontSize: 13, bufferFontSize: 13, termFontSize: 12, lineHeight: "standard",
     dlvPath: "", restoreLastProject: true,
     leftPanels: [], rightPanels: [], defaultLeftTab: "", defaultRightTab: "",
@@ -256,6 +316,160 @@
     applyFontSettings(settings);
   }
 
+  // --- Vim mappings ---
+  const vimModes: VimMappingMode[] = ["normal", "visual", "insert"];
+
+  function addVimMapping() {
+    const next: VimMapping[] = [...(settings.vimMappings ?? []), { lhs: "", rhs: "", mode: "normal" }];
+    updateSetting("vimMappings", next);
+  }
+
+  function removeVimMapping(idx: number) {
+    const next = (settings.vimMappings ?? []).filter((_, i) => i !== idx);
+    updateSetting("vimMappings", next);
+  }
+
+  function updateVimMapping(idx: number, patch: Partial<VimMapping>) {
+    const next = (settings.vimMappings ?? []).map((m, i) => (i === idx ? { ...m, ...patch } : m));
+    updateSetting("vimMappings", next);
+  }
+
+  function onVimMappingModeChange(idx: number, e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value as VimMappingMode;
+    updateVimMapping(idx, { mode: v });
+  }
+
+  // Cheat-sheet of common bindings @replit/codemirror-vim ships out of the
+  // box. This is a curated reference — not exhaustive — so users can see
+  // what works without reading external docs.
+  type CheatRow = { keys: string; desc: string };
+  type CheatGroup = { title: string; rows: CheatRow[] };
+  const vimCheatSheet: CheatGroup[] = [
+    {
+      title: "Motion",
+      rows: [
+        { keys: "h j k l", desc: "Left / Down / Up / Right" },
+        { keys: "w / W", desc: "Next word / WORD start" },
+        { keys: "b / B", desc: "Previous word / WORD start" },
+        { keys: "e / E", desc: "End of word / WORD" },
+        { keys: "0 / ^ / $", desc: "Line start / first non-blank / line end" },
+        { keys: "gg / G", desc: "Top / bottom of file" },
+        { keys: "{n}G", desc: "Jump to line n" },
+        { keys: "% ", desc: "Match bracket" },
+        { keys: "Ctrl-d / Ctrl-u", desc: "Half page down / up" },
+      ],
+    },
+    {
+      title: "Editing",
+      rows: [
+        { keys: "i / a", desc: "Insert before / after cursor" },
+        { keys: "I / A", desc: "Insert at line start / end" },
+        { keys: "o / O", desc: "Open line below / above" },
+        { keys: "x", desc: "Delete character" },
+        { keys: "dd / D", desc: "Delete line / to end of line" },
+        { keys: "cc / C", desc: "Change line / to end of line" },
+        { keys: "yy / Y", desc: "Yank line / to end of line" },
+        { keys: "p / P", desc: "Paste after / before" },
+        { keys: "u / Ctrl-r", desc: "Undo / Redo" },
+        { keys: ".", desc: "Repeat last change" },
+      ],
+    },
+    {
+      title: "Operators + Motion",
+      rows: [
+        { keys: "dw / de", desc: "Delete word / to end of word" },
+        { keys: "ciw / caw", desc: "Change inner word / a word" },
+        { keys: "ci\" / ci'", desc: "Change inside quotes" },
+        { keys: "ci( / cib", desc: "Change inside parens" },
+        { keys: "ci{ / ciB", desc: "Change inside braces" },
+        { keys: "yt,", desc: "Yank up to next comma" },
+        { keys: "d$ / dG", desc: "Delete to end of line / file" },
+      ],
+    },
+    {
+      title: "Visual",
+      rows: [
+        { keys: "v", desc: "Character-wise visual" },
+        { keys: "V", desc: "Line-wise visual" },
+        { keys: "Ctrl-v", desc: "Block visual" },
+        { keys: "o", desc: "Toggle selection anchor (in visual)" },
+        { keys: "y / d / c", desc: "Yank / delete / change selection" },
+        { keys: "> / <", desc: "Indent / dedent selection" },
+      ],
+    },
+    {
+      title: "Search & Replace",
+      rows: [
+        { keys: "/pattern", desc: "Search forward" },
+        { keys: "?pattern", desc: "Search backward" },
+        { keys: "n / N", desc: "Next / previous match" },
+        { keys: "* / #", desc: "Search word under cursor fwd / back" },
+        { keys: ":s/old/new/", desc: "Replace first on line" },
+        { keys: ":%s/old/new/g", desc: "Replace everywhere" },
+      ],
+    },
+    {
+      title: "Marks & Jumps",
+      rows: [
+        { keys: "m{a-z}", desc: "Set mark" },
+        { keys: "'{a-z}", desc: "Jump to mark line" },
+        { keys: "`{a-z}", desc: "Jump to mark position" },
+        { keys: "Ctrl-o / Ctrl-i", desc: "Older / newer jump" },
+      ],
+    },
+    {
+      title: "Ex commands",
+      rows: [
+        { keys: ":w", desc: "Save file" },
+        { keys: ":wq", desc: "Save and (close) — same as :w here" },
+        { keys: ":noh", desc: "Clear search highlight" },
+        { keys: ":{n}", desc: "Jump to line n" },
+      ],
+    },
+  ];
+
+  // Cheat sheet filter state — matches against keys + desc + group title.
+  let cheatQuery = "";
+  $: filteredCheatSheet = (() => {
+    const q = cheatQuery.trim().toLowerCase();
+    if (!q) return vimCheatSheet;
+    return vimCheatSheet
+      .map((g) => ({
+        ...g,
+        rows: g.rows.filter((r) => {
+          const hay = (g.title + " " + r.keys + " " + r.desc).toLowerCase();
+          return q.split(/\s+/).every((w) => hay.includes(w));
+        }),
+      }))
+      .filter((g) => g.rows.length > 0);
+  })();
+
+  // Curated suggestions users frequently want. Each click adds the row to
+  // their custom mappings (deduped on lhs+mode).
+  type MappingSuggestion = VimMapping & { note?: string };
+  const mappingSuggestions: MappingSuggestion[] = [
+    { lhs: "jk", rhs: "<Esc>", mode: "insert", note: "Quick exit from insert mode" },
+    { lhs: "jj", rhs: "<Esc>", mode: "insert", note: "Alt: double-j exit" },
+    { lhs: ";", rhs: ":", mode: "normal", note: "Avoid Shift to enter ex commands" },
+    { lhs: "H", rhs: "^", mode: "normal", note: "Jump to first non-blank" },
+    { lhs: "L", rhs: "$", mode: "normal", note: "Jump to end of line" },
+    { lhs: "<Space>", rhs: ":", mode: "normal", note: "Spacebar opens ex prompt" },
+    { lhs: "Y", rhs: "y$", mode: "normal", note: "Yank to end of line (vim default)" },
+    { lhs: "<", rhs: "<gv", mode: "visual", note: "Re-select after dedent" },
+    { lhs: ">", rhs: ">gv", mode: "visual", note: "Re-select after indent" },
+  ];
+
+  function addSuggestion(s: MappingSuggestion) {
+    const cur = settings.vimMappings ?? [];
+    const exists = cur.some((m) => m.lhs === s.lhs && m.mode === s.mode);
+    if (exists) return;
+    updateSetting("vimMappings", [...cur, { lhs: s.lhs, rhs: s.rhs, mode: s.mode }]);
+  }
+
+  function isSuggestionApplied(s: MappingSuggestion): boolean {
+    return (settings.vimMappings ?? []).some((m) => m.lhs === s.lhs && m.mode === s.mode);
+  }
+
   function applyFontSettings(s: AppSettings) {
     const root = document.documentElement;
     if (s.uiFontSize) root.style.setProperty("--text-md", s.uiFontSize + "px");
@@ -272,6 +486,10 @@
     await pickDebugFile();
     const ws = (await import("./store")).workspace;
     const unsub = ws.subscribe(async (w) => { if (w?.debugFile) { await addDebugFile(w.debugFile); unsub(); } });
+  }
+  async function addFolder() {
+    await pickWorkspaceFolder();
+    await refreshWorkspace();
   }
   async function switchToFile(entry: DebugFileEntry) { await openDebugFile(entry.path); await refreshWorkspace(); }
   async function installTheme() { try { const m = (await ThemeService.ImportFile("")) as any; if (m?.name) await refreshThemeList(); } catch {} }
@@ -371,10 +589,33 @@
         </button>
       </div>
 
-      {#if tab === "appearance"}
+      {#if searchActive}
+        <h2>Search results</h2>
+        {#if searchResults.length === 0}
+          <div class="search-empty">
+            No settings match &ldquo;{searchQuery}&rdquo;.
+          </div>
+        {:else}
+          <div class="search-results">
+            {#each searchResults as r (r.id)}
+              <button class="search-result" on:click={() => gotoSearchResult(r)}>
+                <Icon icon={tabIcons[r.tab]} size={13} color="var(--text-faint)" />
+                <div class="sr-body">
+                  <div class="sr-title">{r.label}</div>
+                  {#if r.description}
+                    <div class="sr-desc">{r.description}</div>
+                  {/if}
+                </div>
+                <span class="sr-tab">{tabLabels[r.tab]}</span>
+                <Icon icon="solar:alt-arrow-right-linear" size={11} color="var(--text-faint)" />
+              </button>
+            {/each}
+          </div>
+        {/if}
+      {:else if tab === "appearance"}
         <h2>Appearance</h2>
 
-        <div class="card">
+        <div class="card" id="appearance-theme">
           <div class="card-header">
             <span class="card-title">Theme</span>
             <button class="btn outlined sm" on:click={installTheme}>
@@ -404,7 +645,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="appearance-font-sizes">
           <div class="card-header"><span class="card-title">Font Sizes</span></div>
           <div class="card-row">
             <span class="card-info"><span class="card-title">UI</span></span>
@@ -418,7 +659,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="appearance-line-height">
           <div class="card-header"><span class="card-title">Line Height</span></div>
           <div class="card-row">
             <div class="btn-group" role="radiogroup" aria-label="Line height">
@@ -431,14 +672,14 @@
 
       {:else if tab === "terminal"}
         <h2>Terminal</h2>
-        <div class="card">
+        <div class="card" id="terminal-font">
           <div class="card-header"><span class="card-title">Font Size</span></div>
           <div class="card-row">
             <input type="range" min="9" max="20" bind:value={settings.termFontSize} on:input={() => updateSetting("termFontSize", settings.termFontSize)} />
             <span class="val">{settings.termFontSize}px</span>
           </div>
         </div>
-        <div class="card">
+        <div class="card" id="terminal-theme">
           <div class="card-header"><span class="card-title">Terminal Theme</span></div>
           <div class="card-row" style="flex-wrap:wrap">
             <button class="seg" class:active={settings.terminalTheme === "follow"} on:click={() => updateSetting("terminalTheme", "follow")}>Follow editor</button>
@@ -449,14 +690,14 @@
         </div>
 
       {:else if tab === "debugfiles"}
-        <h2>Projects</h2>
+        <h2 id="debugfiles-projects">Projects</h2>
         <p class="desc">Folders registered as projects. The most recently used one auto-loads on launch when "Restore last project" is enabled.</p>
         <div class="row" style="margin-bottom: var(--space-3)">
-          <button class="btn primary" on:click={addFile}>
-            <Icon icon="solar:folder-with-files-bold" size={13} /> Open Folder…
+          <button class="btn primary" on:click={addFolder}>
+            <Icon icon="solar:folder-with-files-bold" size={13} /> Open folder…
           </button>
-          <button class="btn outlined" on:click={() => { close(); onOpenImport(); }}>
-            <Icon icon="solar:magnifer-bold" size={13} /> Import launch configs
+          <button class="btn outlined" on:click={addFile}>
+            <Icon icon="solar:document-add-bold" size={13} /> Open debug.json…
           </button>
           {#if ($debugFiles ?? []).some((f) => f.stale)}
             <button class="btn outlined" on:click={async () => { const n = await removeStaleDebugFiles(); showInfo(`Removed ${n} missing project${n === 1 ? "" : "s"}`, ""); }}>
@@ -488,9 +729,137 @@
           {/if}
         </div>
 
+      {:else if tab === "vim"}
+        <h2>Vim</h2>
+        <div class="card" id="vim-toggle">
+          <div class="card-row">
+            <div class="card-info">
+              <span class="card-title">Vim Mode</span>
+              <span class="card-desc">Use Vim keybindings in the source editor</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" checked={settings.vimMode} on:change={(e) => updateSetting("vimMode", e.currentTarget.checked)} />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card" id="vim-mappings" class:disabled-card={!settings.vimMode}>
+          <div class="card-header vim-map-header">
+            <div class="card-info">
+              <span class="card-title">Custom Mappings</span>
+              <span class="card-desc">Map a key sequence (lhs) to another (rhs) for the chosen mode. Saved instantly; takes effect on the next keypress.</span>
+            </div>
+            <button class="btn outlined sm" on:click={addVimMapping} disabled={!settings.vimMode}>
+              <Icon icon="solar:add-circle-linear" size={11} /> Add
+            </button>
+          </div>
+
+          <div class="vim-suggest">
+            <div class="vim-suggest-label">Suggestions</div>
+            <div class="vim-suggest-chips">
+              {#each mappingSuggestions as s}
+                {@const applied = isSuggestionApplied(s)}
+                <button
+                  class="vim-suggest-chip"
+                  class:applied
+                  title={s.note ?? ""}
+                  disabled={!settings.vimMode || applied}
+                  on:click={() => addSuggestion(s)}
+                >
+                  <span class="vim-suggest-mode">{s.mode}</span>
+                  <span class="vim-suggest-keys"><span class="key">{s.lhs}</span>→<span class="key">{s.rhs}</span></span>
+                  {#if applied}<Icon icon="solar:check-circle-bold" size={10} color="var(--success)" />{/if}
+                </button>
+              {/each}
+            </div>
+          </div>
+
+          {#if (settings.vimMappings ?? []).length === 0}
+            <div class="empty">No custom mappings yet — pick a suggestion above or click Add.</div>
+          {:else}
+            <div class="vim-map-table">
+              <div class="vim-map-row vim-map-head">
+                <span>Mode</span>
+                <span>From (lhs)</span>
+                <span>To (rhs)</span>
+                <span></span>
+              </div>
+              {#each settings.vimMappings as m, i (i)}
+                <div class="vim-map-row">
+                  <select
+                    value={m.mode}
+                    on:change={(e) => onVimMappingModeChange(i, e)}
+                  >
+                    {#each vimModes as mode}
+                      <option value={mode}>{mode}</option>
+                    {/each}
+                  </select>
+                  <input
+                    type="text"
+                    spellcheck="false"
+                    placeholder="e.g. jk"
+                    value={m.lhs}
+                    on:change={(e) => updateVimMapping(i, { lhs: e.currentTarget.value })}
+                  />
+                  <input
+                    type="text"
+                    spellcheck="false"
+                    placeholder={'e.g. <Esc>'}
+                    value={m.rhs}
+                    on:change={(e) => updateVimMapping(i, { rhs: e.currentTarget.value })}
+                  />
+                  <button class="btn icon danger" title="Remove" on:click={() => removeVimMapping(i)}>
+                    <Icon icon="solar:trash-bin-minimalistic-linear" size={13} />
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <div class="card" id="vim-cheatsheet">
+          <div class="card-header vim-cheat-header">
+            <span class="card-title">Cheat Sheet</span>
+            <div class="vim-cheat-search">
+              <Icon icon="solar:magnifer-linear" size={12} color="var(--text-faint)" />
+              <input
+                type="text"
+                spellcheck="false"
+                placeholder="Filter… (e.g. yank, visual, paste)"
+                bind:value={cheatQuery}
+              />
+              {#if cheatQuery}
+                <button class="btn icon" title="Clear" on:click={() => (cheatQuery = "")}>
+                  <Icon icon="solar:close-circle-linear" size={12} />
+                </button>
+              {/if}
+            </div>
+          </div>
+          {#if filteredCheatSheet.length === 0}
+            <div class="empty">No bindings match "{cheatQuery}".</div>
+          {:else}
+            <div class="vim-cheat-grid">
+              {#each filteredCheatSheet as group}
+                <div class="vim-cheat-group">
+                  <div class="vim-cheat-title">{group.title}</div>
+                  <div class="vim-cheat-rows">
+                    {#each group.rows as row}
+                      <div class="vim-cheat-row">
+                        <span class="key">{row.keys}</span>
+                        <span class="vim-cheat-desc">{row.desc}</span>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
       {:else if tab === "general"}
         <h2>General</h2>
-        <div class="card">
+        <div class="card" id="general-toggles">
           <div class="card-row">
             <div class="card-info">
               <span class="card-title">Restore last project on launch</span>
@@ -505,18 +874,9 @@
               <span class="slider"></span>
             </label>
           </div>
-          <div class="card-row">
-            <div class="card-info">
-              <span class="card-title">Vim Mode</span>
-              <span class="card-desc">Use Vim keybindings in the source editor</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" checked={settings.vimMode} on:change={(e) => updateSetting("vimMode", e.currentTarget.checked)} />
-              <span class="slider"></span>
-            </label>
-          </div>
         </div>
-        <div class="card">
+
+        <div class="card" id="general-shortcuts">
           <div class="card-header"><span class="card-title">Keyboard Shortcuts</span></div>
           <div class="shortcuts">
             <div><span class="key">⌘⇧P</span> Command Palette</div>
@@ -533,7 +893,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="general-updates">
           <div class="card-header"><span class="card-title">Updates</span></div>
           <div class="card-row">
             <div class="card-info">
@@ -585,7 +945,7 @@
           {/if}
         </div>
 
-        <div class="card">
+        <div class="card" id="general-about">
           <div class="card-header"><span class="card-title">About</span></div>
           <div class="card-row">
             <span class="about-text">DelveUI — Delve debugger GUI for Go</span>
@@ -597,7 +957,7 @@
           {/if}
         </div>
 
-        <div class="field">
+        <div class="field" id="general-reset">
           <span class="field-label">Reset</span>
           <p class="desc">Clear all settings, debug files, and layout. App will restart in first-launch state.</p>
           <div class="row">
@@ -646,6 +1006,79 @@
   .content-header { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-4); }
   .search-box { flex:1; display:flex; align-items:center; gap:var(--space-2); background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:0 var(--space-2); height:28px; }
   .search-input { flex:1; background:transparent; border:0; color:var(--text); font-family:var(--font-ui); font-size:var(--text-sm); outline:none; }
+
+  .search-results {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .search-result {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-sm);
+    text-align: left;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color 80ms ease, background 80ms ease;
+  }
+  .search-result:hover {
+    border-color: var(--accent);
+    background: var(--bg-subtle);
+  }
+  .sr-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sr-title {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sr-desc {
+    color: var(--text-faint);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sr-tab {
+    color: var(--text-faint);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .search-empty {
+    padding: 24px 12px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 13px;
+  }
+
+  /* Pulse a card when search jumps to it. */
+  :global(.flash-highlight) {
+    animation: settings-flash 1.4s ease-out;
+  }
+  @keyframes settings-flash {
+    0%   { box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px rgba(94, 166, 255, 0.25); }
+    100% { box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
+  }
 
   h2 { font-size:var(--text-lg); font-weight:600; color:var(--text); margin:0 0 var(--space-3); }
   h3 { font-size:var(--text-sm); font-weight:600; color:var(--text); margin:0 0 var(--space-2); }
@@ -771,4 +1204,164 @@
   .shortcuts { display:grid; grid-template-columns:1fr 1fr; gap:0; }
   .shortcuts div { padding:var(--space-1) var(--space-3); font-size:var(--text-sm); color:var(--text-muted); border-bottom:1px solid var(--border-subtle); }
   .key { display:inline-block; padding:1px 6px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text); margin-right:var(--space-2); min-width:48px; text-align:center; }
+
+  /* Vim mappings */
+  .disabled-card { opacity: 0.55; }
+  .vim-map-header { display:flex; align-items:flex-start; gap:var(--space-3); justify-content:space-between; }
+  .vim-map-header .card-info { flex:1; min-width:0; }
+  .vim-map-table { display:flex; flex-direction:column; }
+  .vim-map-row {
+    display:grid;
+    grid-template-columns: 110px 1fr 1.4fr auto;
+    gap:var(--space-2);
+    align-items:center;
+    padding:var(--space-1) var(--space-3);
+    border-bottom:1px solid var(--border-subtle);
+  }
+  .vim-map-row:last-child { border-bottom:none; }
+  .vim-map-head {
+    font-size:var(--text-xs);
+    color:var(--text-faint);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    padding-top:var(--space-2);
+    padding-bottom:var(--space-2);
+  }
+  .vim-map-row select,
+  .vim-map-row input[type="text"] {
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:var(--text-sm);
+    padding:4px 8px;
+    width:100%;
+    min-width:0;
+  }
+  .vim-map-row select:focus,
+  .vim-map-row input[type="text"]:focus {
+    outline:none;
+    border-color:var(--accent);
+  }
+
+  /* Vim suggestion chips */
+  .vim-suggest {
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    padding:var(--space-2) var(--space-3);
+    border-bottom:1px solid var(--border-subtle);
+    background:var(--bg-subtle);
+  }
+  .vim-suggest-label {
+    font-size:var(--text-xs);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:var(--text-faint);
+  }
+  .vim-suggest-chips {
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .vim-suggest-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:3px 8px;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    font-size:var(--text-xs);
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:border-color 80ms ease, background 80ms ease;
+  }
+  .vim-suggest-chip:hover:not(:disabled) {
+    border-color:var(--accent);
+    color:var(--text);
+  }
+  .vim-suggest-chip:disabled { cursor:default; opacity:0.6; }
+  .vim-suggest-chip.applied {
+    border-color:var(--success);
+    background:color-mix(in srgb, var(--success) 8%, transparent);
+  }
+  .vim-suggest-mode {
+    font-family:var(--font-mono);
+    font-size:9px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:var(--text-faint);
+    padding:1px 4px;
+    background:var(--bg-subtle);
+    border-radius:3px;
+  }
+  .vim-suggest-keys { display:inline-flex; align-items:center; gap:4px; }
+  .vim-suggest-keys .key { margin-right:0; min-width:0; padding:1px 5px; }
+
+  /* Vim cheat sheet */
+  .vim-cheat-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:var(--space-3);
+  }
+  .vim-cheat-search {
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    padding:2px 6px;
+    min-width:240px;
+  }
+  .vim-cheat-search:focus-within { border-color:var(--accent); }
+  .vim-cheat-search input {
+    flex:1;
+    min-width:0;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-size:var(--text-sm);
+    font-family:var(--font-mono);
+    padding:2px 0;
+  }
+  .vim-cheat-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+    gap:var(--space-3);
+    padding:var(--space-3);
+  }
+  .vim-cheat-group {
+    border:1px solid var(--border-subtle);
+    border-radius:var(--radius-sm);
+    background:var(--bg);
+  }
+  .vim-cheat-title {
+    font-size:var(--text-xs);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:var(--text-faint);
+    padding:var(--space-2) var(--space-3);
+    border-bottom:1px solid var(--border-subtle);
+  }
+  .vim-cheat-rows { display:flex; flex-direction:column; }
+  .vim-cheat-row {
+    display:grid;
+    grid-template-columns:auto 1fr;
+    align-items:center;
+    gap:var(--space-2);
+    padding:4px var(--space-3);
+    font-size:var(--text-sm);
+  }
+  .vim-cheat-row .key {
+    margin-right:0;
+    min-width:0;
+    padding:1px 8px;
+    white-space:nowrap;
+  }
+  .vim-cheat-desc { color:var(--text-muted); }
 </style>

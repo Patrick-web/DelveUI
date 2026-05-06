@@ -6,8 +6,6 @@
   import ConsolePanel from "./ConsolePanel.svelte";
   import ProjectSelector from "./ProjectSelector.svelte";
 
-  export let onOpenImport: () => void = () => {};
-
   const tabs: { id: CenterTabId; label: string }[] = [
     { id: "terminal", label: "Terminal" },
     { id: "console",  label: "Debug Console" },
@@ -15,15 +13,15 @@
   ];
 
   $: active = $layout.centerActive;
-  // A workspace counts as "open" if it has either a debug file or just a
-  // root folder (the latter is the VS Code-style "Open Folder" case — no
-  // launch.json yet, but discovery still finds run targets).
+  // A workspace counts as "open" if it has either a debug file loaded or
+  // just a root folder — the latter is still useful since the Run tab
+  // shows targets discovered inside that folder.
   $: hasProject = !!$workspace?.root || !!$workspace?.debugFile;
 </script>
 
 <div class="center">
   {#if !hasProject}
-    <ProjectSelector {onOpenImport} />
+    <ProjectSelector />
   {:else}
     <div class="head">
       <div class="segmented" role="tablist">
