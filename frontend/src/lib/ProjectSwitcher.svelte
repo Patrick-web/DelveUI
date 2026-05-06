@@ -3,7 +3,7 @@
   import { Events } from "@wailsio/runtime";
   import * as SessionService from "../../bindings/github.com/jp/DelveUI/internal/services/sessionservice";
   import { workspace, sessions, openDebugFile, refreshWorkspace, refreshSessions } from "./store";
-  import { debugFiles, loadDebugFiles, setDefaultDebugFile, type DebugFileEntry } from "./settings-store";
+  import { debugFiles, loadDebugFiles, removeDebugFile, type DebugFileEntry } from "./settings-store";
   import Icon from "./Icon.svelte";
 
   let dropdownOpen = false;
@@ -31,29 +31,34 @@
     };
   });
 
-  function dirOf(p: string): string {
-    if (!p) return "";
-    const home = (p.match(/^\/Users\/[^/]+/) ?? [""])[0];
-    const short = home ? p.replace(home, "~") : p;
-    const i = short.lastIndexOf("/");
-    return i >= 0 ? short.slice(0, i) : short;
+  // Every project entry is now a folder; we still derive the label from the
+  // backend-supplied label when present so legacy migrated entries keep their
+  // user-facing name.
+  function pathDisplay(entry: DebugFileEntry | null | undefined): string {
+    const p = entry?.path ?? "";
+    return p ? p.replace(/^\/Users\/[^/]+/, "~") : "";
   }
 
   function labelFor(entry: DebugFileEntry | null | undefined, fallbackPath = ""): string {
     if (entry?.label) return entry.label;
     const path = entry?.path ?? fallbackPath;
     if (!path) return "";
-    // basename of the parent's parent dir (debug.json typically lives in <proj>/.zed/debug.json)
     const parts = path.split("/").filter(Boolean);
-    return parts[parts.length - 3] ?? parts[parts.length - 2] ?? parts[parts.length - 1] ?? path;
+    return parts[parts.length - 1] ?? path;
   }
 
-  $: currentEntry = ($debugFiles ?? []).find((e) => e.path === ($workspace?.debugFile ?? "")) ?? null;
-  $: currentLabel = labelFor(currentEntry, $workspace?.debugFile ?? "");
+  function isCurrent(entry: DebugFileEntry): boolean {
+    return entry.path === ($workspace?.root ?? "");
+  }
+
+  $: currentEntry = ($debugFiles ?? []).find(isCurrent) ?? null;
+  $: currentLabel = labelFor(currentEntry, $workspace?.root ?? "");
+  // MRU sort: most recent first, with stale entries pushed to the bottom so
+  // healthy projects always lead the list.
   $: entries = ($debugFiles ?? []).slice().sort((a, b) => {
-    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
-    const at = new Date(a.addedAt).getTime() || 0;
-    const bt = new Date(b.addedAt).getTime() || 0;
+    if (!!a.stale !== !!b.stale) return a.stale ? 1 : -1;
+    const at = new Date(a.lastUsed ?? a.addedAt).getTime() || 0;
+    const bt = new Date(b.lastUsed ?? b.addedAt).getTime() || 0;
     return bt - at;
   });
 
@@ -64,8 +69,18 @@
 
   function pick(entry: DebugFileEntry) {
     dropdownOpen = false;
-    if (entry.path === ($workspace?.debugFile ?? "")) return;
+    if (entry.stale) return; // can't open a missing folder
+    if (isCurrent(entry)) return;
     pendingEntry = entry;
+  }
+
+  async function onRemove(e: Event, entry: DebugFileEntry) {
+    e.stopPropagation();
+    await removeDebugFile(entry.id);
+  }
+
+  function onRemoveKey(e: KeyboardEvent, entry: DebugFileEntry) {
+    if (e.key === "Enter" || e.key === " ") onRemove(e, entry);
   }
 
   async function openHere() {
@@ -83,16 +98,6 @@
       switching = false;
       pendingEntry = null;
     }
-  }
-
-  async function makeDefault(e: Event, entry: DebugFileEntry) {
-    e.stopPropagation();
-    if (entry.isDefault) return; // unsetting requires picking another default — keep simple
-    await setDefaultDebugFile(entry.id);
-  }
-
-  function onStarKey(e: KeyboardEvent, entry: DebugFileEntry) {
-    if (e.key === "Enter" || e.key === " ") makeDefault(e, entry);
   }
 
   async function openInNew() {
@@ -122,34 +127,38 @@
       {#each entries as e (e.id)}
         <button
           class="ps-item"
-          class:active={e.path === ($workspace?.debugFile ?? "")}
+          class:active={isCurrent(e)}
+          class:stale={e.stale}
+          title={e.stale ? `Folder missing: ${e.path}` : e.path}
           on:click={() => pick(e)}
         >
-          <Icon icon="solar:folder-bold" size={12} color="var(--accent)" />
+          <Icon
+            icon="solar:folder-open-bold"
+            size={12}
+            color={e.stale ? "var(--text-faint)" : "var(--accent)"}
+          />
           <div class="ps-item-body">
             <div class="ps-item-title">
               <span class="ps-item-name">{labelFor(e)}</span>
+              {#if e.stale}
+                <span class="ps-stale-badge" title="Folder no longer exists">missing</span>
+              {/if}
             </div>
-            <div class="ps-item-path">{dirOf(e.path)}</div>
+            <div class="ps-item-path">{pathDisplay(e)}</div>
           </div>
-          <span
-            class="ps-star"
-            class:is-default={e.isDefault}
-            role="button"
-            tabindex="0"
-            title={e.isDefault ? "Default project (loads on launch)" : "Set as default project"}
-            on:click={(ev) => makeDefault(ev, e)}
-            on:keydown={(ev) => onStarKey(ev, e)}
-          >
-            <Icon
-              icon={e.isDefault ? "solar:star-bold" : "solar:star-linear"}
-              size={12}
-              color={e.isDefault ? "var(--warning)" : "var(--text-faint)"}
-            />
-          </span>
-          {#if e.path === ($workspace?.debugFile ?? "")}
+          {#if isCurrent(e)}
             <Icon icon="solar:check-circle-bold" size={12} color="var(--success)" />
           {/if}
+          <span
+            class="ps-rm"
+            role="button"
+            tabindex="0"
+            title="Remove from list"
+            on:click={(ev) => onRemove(ev, e)}
+            on:keydown={(ev) => onRemoveKey(ev, e)}
+          >
+            <Icon icon="solar:close-circle-linear" size={12} color="var(--text-faint)" />
+          </span>
         </button>
       {/each}
     </div>
@@ -164,7 +173,7 @@
       <div>
         <h3>Switch project?</h3>
         <p class="ps-modal-sub">{labelFor(pendingEntry)}</p>
-        <p class="ps-modal-path">{dirOf(pendingEntry.path)}</p>
+        <p class="ps-modal-path">{pathDisplay(pendingEntry)}</p>
       </div>
     </div>
     <p class="ps-modal-body">
@@ -263,15 +272,25 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .ps-item-path {
+  .ps-stale-badge {
     font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text-faint);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 9px;
+    color: var(--danger);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    padding: 0 4px;
+    margin-left: 6px;
+    flex-shrink: 0;
   }
-  .ps-star {
+  .ps-item.stale {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .ps-item.stale:hover {
+    background: transparent;
+  }
+  .ps-rm {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -281,9 +300,17 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-  .ps-star:hover { background: rgba(255, 255, 255, 0.08); }
-  .ps-star.is-default { cursor: default; }
-
+  .ps-rm:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .ps-item-path {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .ps-backdrop {
     position: fixed;
     inset: 0;

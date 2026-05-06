@@ -9,7 +9,7 @@
     loadDebugFiles,
     addDebugFile,
     removeDebugFile,
-    setDefaultDebugFile,
+    removeStaleDebugFiles,
     reloadDebugFile,
     type AppSettings,
     type DebugFileEntry,
@@ -140,7 +140,8 @@
   let settings: AppSettings = {
     theme: "One Dark", terminalTheme: "follow", vimMode: false,
     uiFontSize: 13, bufferFontSize: 13, termFontSize: 12, lineHeight: "standard",
-    dlvPath: "", leftPanels: [], rightPanels: [], defaultLeftTab: "", defaultRightTab: "",
+    dlvPath: "", restoreLastProject: true,
+    leftPanels: [], rightPanels: [], defaultLeftTab: "", defaultRightTab: "",
   };
   let previewTheme: string | null = null;
   let committed = false;
@@ -448,40 +449,62 @@
         </div>
 
       {:else if tab === "debugfiles"}
-        <h2>Debug Files</h2>
-        <p class="desc">Manage debug.json files. The default file auto-loads on app launch.</p>
+        <h2>Projects</h2>
+        <p class="desc">Folders registered as projects. The most recently used one auto-loads on launch when "Restore last project" is enabled.</p>
         <div class="row" style="margin-bottom: var(--space-3)">
           <button class="btn primary" on:click={addFile}>
-            <Icon icon="solar:add-circle-bold" size={13} /> Add debug.json
+            <Icon icon="solar:folder-with-files-bold" size={13} /> Open Folder…
           </button>
           <button class="btn outlined" on:click={() => { close(); onOpenImport(); }}>
-            <Icon icon="solar:magnifer-bold" size={13} /> Auto-detect from editors
+            <Icon icon="solar:magnifer-bold" size={13} /> Import launch configs
           </button>
+          {#if ($debugFiles ?? []).some((f) => f.stale)}
+            <button class="btn outlined" on:click={async () => { const n = await removeStaleDebugFiles(); showInfo(`Removed ${n} missing project${n === 1 ? "" : "s"}`, ""); }}>
+              <Icon icon="solar:eraser-linear" size={13} /> Clean up missing
+            </button>
+          {/if}
         </div>
         <div class="file-list">
           {#each $debugFiles as f}
-            <div class="file-row" role="listitem">
-              <button class="star" title={f.isDefault ? "Default" : "Set as default"} on:click={() => setDefaultDebugFile(f.id)}>
-                <Icon icon={f.isDefault ? "solar:star-bold" : "solar:star-linear"} size={14} color={f.isDefault ? "var(--warning)" : "var(--text-faint)"} />
-              </button>
+            <div class="file-row" role="listitem" class:stale={f.stale}>
+              <Icon icon="solar:folder-open-bold" size={14} color={f.stale ? "var(--text-faint)" : "var(--accent)"} />
               <div class="file-info">
-                <div class="file-label">{f.label}</div>
+                <div class="file-label">
+                  {f.label}
+                  {#if f.stale}<span class="missing-badge" title="Folder no longer exists">missing</span>{/if}
+                </div>
                 <div class="file-path">{f.path}</div>
                 <div class="file-meta">{f.configs?.length ?? 0} configs</div>
               </div>
-              <button class="btn icon" title="Switch" on:click={() => switchToFile(f)}><Icon icon="solar:arrow-right-bold" size={13} /></button>
-              <button class="btn icon" title="Reload" on:click={() => reloadDebugFile(f.id)}><Icon icon="solar:refresh-linear" size={13} /></button>
+              {#if !f.stale}
+                <button class="btn icon" title="Switch" on:click={() => switchToFile(f)}><Icon icon="solar:arrow-right-bold" size={13} /></button>
+                <button class="btn icon" title="Reload configs" on:click={() => reloadDebugFile(f.id)}><Icon icon="solar:refresh-linear" size={13} /></button>
+              {/if}
               <button class="btn icon danger" title="Remove" on:click={() => removeDebugFile(f.id)}><Icon icon="solar:trash-bin-minimalistic-linear" size={13} /></button>
             </div>
           {/each}
           {#if $debugFiles.length === 0}
-            <div class="empty">No debug files added yet.</div>
+            <div class="empty">No projects yet. Click <strong>Open Folder…</strong> to register one.</div>
           {/if}
         </div>
 
       {:else if tab === "general"}
         <h2>General</h2>
         <div class="card">
+          <div class="card-row">
+            <div class="card-info">
+              <span class="card-title">Restore last project on launch</span>
+              <span class="card-desc">When enabled, the most-recently-active project reopens automatically. Turn off to land on the welcome page each time.</span>
+            </div>
+            <label class="switch">
+              <input
+                type="checkbox"
+                checked={settings.restoreLastProject !== false}
+                on:change={(e) => updateSetting("restoreLastProject", e.currentTarget.checked)}
+              />
+              <span class="slider"></span>
+            </label>
+          </div>
           <div class="card-row">
             <div class="card-info">
               <span class="card-title">Vim Mode</span>
@@ -737,9 +760,10 @@
   .file-row { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2); background:var(--bg-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); outline:none; }
   .file-row:hover { background:var(--bg-elevated); }
   .file-row:focus-visible { outline:2px solid var(--accent); outline-offset:-1px; }
-  .star { background:transparent; border:0; cursor:pointer; padding:0; }
+  .file-row.stale { opacity:0.55; }
   .file-info { flex:1; min-width:0; }
   .file-label { font-size:var(--text-sm); font-weight:600; color:var(--text); }
+  .missing-badge { font-family:var(--font-mono); font-size:9px; color:var(--danger); background:var(--bg); border:1px solid var(--border-subtle); border-radius:3px; padding:0 4px; margin-left:6px; }
   .file-path { font-size:var(--text-xs); color:var(--text-faint); font-family:var(--font-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .file-meta { font-size:var(--text-xs); color:var(--text-muted); }
   .empty { padding:var(--space-3); color:var(--text-faint); font-size:var(--text-sm); }

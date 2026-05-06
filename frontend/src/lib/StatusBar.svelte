@@ -8,11 +8,32 @@
     activeSessionId,
   } from "./store";
   import * as SessionService from "../../bindings/github.com/jp/DelveUI/internal/services/sessionservice";
+  import Icon from "./Icon.svelte";
+  import NotificationsPanel from "./NotificationsPanel.svelte";
+  import {
+    notifications,
+    unreadCount,
+    markNotificationsRead,
+  } from "./toast";
 
   let appMem = "";
   let uptime = "";
   let timer: any;
   const startTime = Date.now();
+
+  // Notifications popover wiring. Mark unread items as read whenever the
+  // popover opens, so the badge clears on first peek.
+  let notifOpen = false;
+  let notifWrap: HTMLDivElement;
+  function toggleNotifs() {
+    notifOpen = !notifOpen;
+    if (notifOpen) markNotificationsRead();
+  }
+  function onWindowClick(e: MouseEvent) {
+    if (!notifOpen) return;
+    const t = e.target as Node;
+    if (notifWrap && !notifWrap.contains(t)) notifOpen = false;
+  }
 
   $: running = Object.values($sessions).filter(
     (s) => s.state === "running" || s.state === "stopped",
@@ -69,6 +90,8 @@
   onDestroy(() => clearInterval(timer));
 </script>
 
+<svelte:window on:click={onWindowClick} />
+
 <footer class="statusbar">
   <div class="left">
     {#if $activeSession}
@@ -100,6 +123,24 @@
       <span class="sep">·</span>
       <span>{uptime}</span>
     {/if}
+    <div class="notif" bind:this={notifWrap}>
+      <button
+        class="notif-btn"
+        class:has-unread={$unreadCount > 0}
+        title={$notifications.length === 0
+          ? "No notifications"
+          : `${$notifications.length} notification${$notifications.length === 1 ? "" : "s"}${$unreadCount > 0 ? ` (${$unreadCount} unread)` : ""}`}
+        on:click={toggleNotifs}
+      >
+        <Icon icon="solar:bell-linear" size={12} />
+        {#if $unreadCount > 0}
+          <span class="badge unread">{$unreadCount > 9 ? "9+" : $unreadCount}</span>
+        {/if}
+      </button>
+      {#if notifOpen}
+        <NotificationsPanel onClose={() => (notifOpen = false)} />
+      {/if}
+    </div>
   </div>
 </footer>
 
@@ -134,5 +175,40 @@
     border: 1px solid var(--border-subtle);
     border-radius: 3px;
     color: var(--text-faint);
+  }
+  .notif {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: var(--space-1);
+  }
+  .notif-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    padding: 0 4px;
+    height: 18px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .notif-btn:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--border-subtle);
+  }
+  .notif-btn.has-unread {
+    color: var(--text);
+  }
+  .badge.unread {
+    background: var(--danger);
+    color: #fff;
+    border-color: transparent;
+    font-weight: 600;
+    padding: 0 5px;
+    line-height: 14px;
+    height: 14px;
   }
 </style>

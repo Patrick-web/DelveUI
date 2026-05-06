@@ -68,11 +68,13 @@
     const list = Object.values($sessions);
     if (list.length && !$activeSessionId) activeSessionId.set(list[0].id);
 
-    const { loadDebugFiles, debugFiles } = await import("./lib/settings-store");
+    const { loadDebugFiles } = await import("./lib/settings-store");
     await loadDebugFiles();
-    const { get } = await import("svelte/store");
-    const files = get(debugFiles);
-    if (files.length === 0 && !$workspace?.configs?.length) {
+    // Welcome page shows when nothing is open — the Welcome page itself lists
+    // recents alongside Open Folder, so it's a useful landing surface even
+    // when the user already has registered projects (e.g. they turned off
+    // "Restore last project" in settings).
+    if (!$workspace?.root && !$workspace?.debugFile) {
       showWelcome = true;
     }
 

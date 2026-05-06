@@ -99,13 +99,10 @@ func parseVSCode(path string, projectDir string) ([]config.LaunchConfig, error) 
 }
 
 func resolveVSCodeVars(s string, projectDir string) string {
-	s = strings.ReplaceAll(s, "${workspaceFolder}", projectDir)
-	s = strings.ReplaceAll(s, "${workspaceRoot}", projectDir)
-	home, _ := os.UserHomeDir()
-	if home != "" {
-		s = strings.ReplaceAll(s, "${userHome}", home)
-	}
-	return s
+	// Delegate to the shared expander so we stay consistent with the workspace
+	// loader path. Both code paths must understand the same variable set or
+	// configs that work via "Import" break when opened directly, and vice-versa.
+	return config.ExpandPath(s, projectDir)
 }
 
 // --- GoLand / JetBrains ---

@@ -35,10 +35,9 @@
 
   $: entries = $debugFiles ?? [];
   $: sorted = [...entries].sort((a, b) => {
-    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
-    // Most recently added first
-    const at = new Date(a.addedAt).getTime() || 0;
-    const bt = new Date(b.addedAt).getTime() || 0;
+    if (!!a.stale !== !!b.stale) return a.stale ? 1 : -1;
+    const at = new Date(a.lastUsed ?? a.addedAt).getTime() || 0;
+    const bt = new Date(b.lastUsed ?? b.addedAt).getTime() || 0;
     return bt - at;
   });
 </script>
@@ -76,14 +75,14 @@
               <div class="card-body">
                 <div class="card-title-row">
                   <span class="card-title">{e.label || dirOf(e.path).split("/").pop()}</span>
-                  {#if e.isDefault}
-                    <span class="badge">default</span>
+                  {#if e.stale}
+                    <span class="badge stale" title="Folder no longer exists">missing</span>
                   {/if}
                   {#if e.configs && e.configs.length}
                     <span class="cfg-count">{e.configs.length} cfg{e.configs.length !== 1 ? "s" : ""}</span>
                   {/if}
                 </div>
-                <div class="card-path">{dirOf(e.path)}</div>
+                <div class="card-path">{short(e.path)}</div>
               </div>
               <div class="card-cta">
                 <Icon icon="solar:alt-arrow-right-linear" size={14} color="var(--text-faint)" />
@@ -235,6 +234,9 @@
     border-radius: 8px;
     letter-spacing: 0.4px;
     text-transform: uppercase;
+  }
+  .badge.stale {
+    background: var(--danger);
   }
   .cfg-count {
     font-size: 10px;

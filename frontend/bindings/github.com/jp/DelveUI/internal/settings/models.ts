@@ -14,6 +14,13 @@ export class Settings {
     "termFontSize": number;
     "lineHeight": string;
     "dlvPath": string;
+
+    /**
+     * RestoreLastProject controls the auto-open behavior on launch. When true,
+     * the most-recently-active project is reopened. When false, the user lands
+     * on the welcome page.
+     */
+    "restoreLastProject"?: boolean | null;
     "leftPanels": string[];
     "rightPanels": string[];
     "defaultLeftTab": string;
@@ -65,14 +72,14 @@ export class Settings {
      * Creates a new Settings instance from a string or object.
      */
     static createFrom($$source: any = {}): Settings {
-        const $$createField8_0 = $$createType0;
         const $$createField9_0 = $$createType0;
+        const $$createField10_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("leftPanels" in $$parsedSource) {
-            $$parsedSource["leftPanels"] = $$createField8_0($$parsedSource["leftPanels"]);
+            $$parsedSource["leftPanels"] = $$createField9_0($$parsedSource["leftPanels"]);
         }
         if ("rightPanels" in $$parsedSource) {
-            $$parsedSource["rightPanels"] = $$createField9_0($$parsedSource["rightPanels"]);
+            $$parsedSource["rightPanels"] = $$createField10_0($$parsedSource["rightPanels"]);
         }
         return new Settings($$parsedSource as Partial<Settings>);
     }

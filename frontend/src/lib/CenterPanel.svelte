@@ -15,7 +15,10 @@
   ];
 
   $: active = $layout.centerActive;
-  $: hasProject = !!$workspace?.debugFile;
+  // A workspace counts as "open" if it has either a debug file or just a
+  // root folder (the latter is the VS Code-style "Open Folder" case — no
+  // launch.json yet, but discovery still finds run targets).
+  $: hasProject = !!$workspace?.root || !!$workspace?.debugFile;
 </script>
 
 <div class="center">

@@ -25,6 +25,14 @@ type LaunchConfig struct {
 	Disabled     bool              `json:"disabled,omitempty"`
 	DisabledNote string            `json:"disabledNote,omitempty"`
 	Language     string            `json:"language,omitempty"`
+	// ProcessID is set when Request == "attach". Delve's DAP server expects
+	// it as `processId` in the attach request body.
+	ProcessID int `json:"processId,omitempty"`
+	// EnvFiles records the dotenv files the discovery layer found via walk-up
+	// (outermost → innermost). Their contents are already merged into Env at
+	// launch time; this is preserved purely so the UI can show *which* files
+	// contributed (the env inspector lists them as sources).
+	EnvFiles []string `json:"envFiles,omitempty"`
 }
 
 // LoadFromWorkspace looks for debug configs in a directory, checking multiple
@@ -112,31 +120,74 @@ func projectRoot(configPath string) string {
 	return parent
 }
 
-// expandTemplateVars substitutes the handful of editor template variables we
-// understand into cfg string fields. Safe to run on any config — unknown
-// files simply contain no matches.
+// expandTemplateVars substitutes the editor template variables we understand
+// into cfg string fields. Safe to run on any config — unknown files simply
+// contain no matches.
+//
+// Variables handled:
+//   - $ZED_WORKTREE_ROOT, ${ZED_WORKTREE_ROOT}  → workspace root (Zed)
+//   - ${workspaceFolder}, ${workspaceRoot}       → workspace root (VS Code)
+//   - ${userHome}                                → user's home dir (VS Code 1.69+)
+//   - ${env:HOME}, $HOME                         → user's home dir (best-effort)
+//   - leading ~                                   → user's home dir (shell)
+//
+// Unexpanded variables that reach `os.Stat` produce confusing errors like
+// "open ${userHome}/foo: no such file or directory" — keep this list in sync
+// with detect/parsers.go's resolveVSCodeVars.
 func expandTemplateVars(cfgs []LaunchConfig, root string) {
-	if root == "" {
-		return
-	}
-	r := strings.NewReplacer(
-		"$ZED_WORKTREE_ROOT", root,
-		"${ZED_WORKTREE_ROOT}", root,
-		"${workspaceFolder}", root,
-		"${workspaceRoot}", root,
-	)
+	expand := func(s string) string { return ExpandPath(s, root) }
 	for i := range cfgs {
-		cfgs[i].Program = r.Replace(cfgs[i].Program)
-		cfgs[i].Cwd = r.Replace(cfgs[i].Cwd)
-		cfgs[i].EnvFile = r.Replace(cfgs[i].EnvFile)
+		cfgs[i].Program = expand(cfgs[i].Program)
+		cfgs[i].Cwd = expand(cfgs[i].Cwd)
+		cfgs[i].EnvFile = expand(cfgs[i].EnvFile)
 		for j := range cfgs[i].Args {
-			cfgs[i].Args[j] = r.Replace(cfgs[i].Args[j])
+			cfgs[i].Args[j] = expand(cfgs[i].Args[j])
 		}
 		for j := range cfgs[i].BuildFlags {
-			cfgs[i].BuildFlags[j] = r.Replace(cfgs[i].BuildFlags[j])
+			cfgs[i].BuildFlags[j] = expand(cfgs[i].BuildFlags[j])
 		}
 		for k, v := range cfgs[i].Env {
-			cfgs[i].Env[k] = r.Replace(v)
+			cfgs[i].Env[k] = expand(v)
 		}
 	}
+}
+
+// ExpandPath performs editor template-variable + shell-style expansion on a
+// single string. `root` is the workspace root used for ${workspaceFolder} /
+// ${workspaceRoot} / $ZED_WORKTREE_ROOT — pass "" if not applicable. Use this
+// at every system boundary that accepts a user-provided path: workspace open,
+// debug-file open, file-tree navigation, etc.
+func ExpandPath(s, root string) string {
+	if s == "" {
+		return s
+	}
+	home, _ := os.UserHomeDir()
+
+	// ~ at the start expands to home (matches shell behaviour).
+	if strings.HasPrefix(s, "~/") && home != "" {
+		s = home + s[1:]
+	} else if s == "~" && home != "" {
+		s = home
+	}
+
+	pairs := []string{}
+	if root != "" {
+		pairs = append(pairs,
+			"$ZED_WORKTREE_ROOT", root,
+			"${ZED_WORKTREE_ROOT}", root,
+			"${workspaceFolder}", root,
+			"${workspaceRoot}", root,
+		)
+	}
+	if home != "" {
+		pairs = append(pairs,
+			"${userHome}", home,
+			"${env:HOME}", home,
+			"$HOME", home,
+		)
+	}
+	if len(pairs) == 0 {
+		return s
+	}
+	return strings.NewReplacer(pairs...).Replace(s)
 }

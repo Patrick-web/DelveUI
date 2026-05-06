@@ -109,13 +109,13 @@
     border-top: 1px solid var(--border-subtle);
     padding: 6px;
     flex-shrink: 0;
-    max-height: 40%;
+    max-height: 50%;
     overflow: auto;
   }
   .launch h2 {
     font-size: 10px; color: var(--text-faint);
     text-transform: uppercase; letter-spacing: 0.8px;
-    padding: 4px 8px 4px; font-weight: 700;
+    padding: 6px 8px 4px; font-weight: 700;
   }
   .cfg {
     display: flex; align-items: center; gap: 8px; width: 100%;
@@ -124,10 +124,30 @@
     font: inherit; font-size: 12px; text-align: left;
   }
   .cfg:hover { background: rgba(255, 255, 255, 0.04); }
+  .cfg:disabled { cursor: default; opacity: 0.7; }
+  .cfg:disabled:hover { background: transparent; }
   .cfg .play {
     color: var(--success);
     display: inline-flex; width: 14px; justify-content: center;
   }
+  .cfg .label-main { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cfg .kind {
+    font-family: var(--font-mono); font-size: 9px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  /* Spinner used for instant click feedback in launch buttons + sessions starting state */
+  .spin {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: tray-spin 0.8s linear infinite;
+    display: inline-block;
+  }
+  @keyframes tray-spin { to { transform: rotate(360deg); } }
 
   /* Footer */
   .footer {
@@ -151,8 +171,10 @@
 
   <div class="sessions" id="sessions"></div>
   <div class="launch" id="launch" style="display:none">
-    <h2>Launch</h2>
+    <h2 id="debug-h" style="display:none">Debug</h2>
     <div id="configs"></div>
+    <h2 id="run-h" style="display:none">Run</h2>
+    <div id="targets"></div>
   </div>
 
   <div class="footer">
@@ -168,10 +190,27 @@
     async function callWS(method, ...args) {
       return Call.ByName(`github.com/jp/DelveUI/internal/services.WorkspaceService.${method}`, ...args);
     }
+    async function callDisc(method, ...args) {
+      return Call.ByName(`github.com/jp/DelveUI/internal/discovery.Service.${method}`, ...args);
+    }
 
     const sessionsEl = document.getElementById("sessions");
     const configsEl = document.getElementById("configs");
+    const targetsEl = document.getElementById("targets");
     const launchSection = document.getElementById("launch");
+    const debugH = document.getElementById("debug-h");
+    const runH = document.getElementById("run-h");
+
+    // Targets-launching feedback: ids the user just clicked, while the
+    // backend Start/Launch call is still in flight. Cleared when the call
+    // settles — at which point the launched cfg/target either appears in
+    // the running-sessions list (and is filtered out of "available") or
+    // the row reappears clickable on failure.
+    const launching = new Set();
+    // Lazy first scan: only triggered when Targets() returns empty AND a
+    // workspace is open, so first tray-open after app start still surfaces
+    // discovery items even if the main window's Run tab hasn't been visited.
+    let triedDiscovery = false;
 
     const ICONS = {
       open:  '<svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M7 7h10v10"/></svg>',
@@ -179,20 +218,75 @@
       play:  '<svg class="i" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>',
     };
 
+    // Read the recency map written by the main window's recency-store. Same
+    // localStorage origin, so the tray sees launches from anywhere in the app.
+    function readRecency() {
+      try {
+        const raw = localStorage.getItem("delveui:recency:v1");
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch { return {}; }
+    }
+    function recencyCmp(rec, idKey) {
+      return (a, b) => {
+        const at = rec[a[idKey]] ?? 0;
+        const bt = rec[b[idKey]] ?? 0;
+        if (at !== bt) return bt - at;
+        return (a.label ?? "").localeCompare(b.label ?? "", undefined, { sensitivity: "base" });
+      };
+    }
+
+    async function fetchTargets(hasWorkspace) {
+      let res = null;
+      try { res = await callDisc("Targets"); } catch {}
+      let targets = (res && res.targets) || [];
+      if (!triedDiscovery && targets.length === 0 && hasWorkspace) {
+        triedDiscovery = true;
+        try {
+          const refreshed = await callDisc("Refresh");
+          targets = refreshed || [];
+        } catch {}
+      }
+      return targets;
+    }
+
+    function makeLaunchButton({ id, label, kind, onClick }) {
+      const btn = document.createElement("button");
+      btn.className = "cfg";
+      const isLaunching = launching.has(id);
+      const leading = isLaunching ? '<span class="spin"></span>' : `<span class="play">${ICONS.play}</span>`;
+      const kindBadge = kind ? `<span class="kind">${esc(kind)}</span>` : "";
+      btn.innerHTML = `${leading}<span class="label-main">${esc(label)}</span>${kindBadge}`;
+      btn.disabled = isLaunching;
+      btn.onclick = onClick;
+      return btn;
+    }
+
     async function refresh() {
+      const rec = readRecency();
+
       // sessions
       let list = [];
       try { list = await callService("SessionService", "List"); } catch {}
+      // Drop dead sessions — exited or errored. Their PIDs no longer point
+      // to a live process, so showing them in the tray is misleading.
+      list = (list || [])
+        .filter((s) => s.state !== "exited" && s.state !== "error")
+        .sort(recencyCmp(rec, "cfgId"));
       sessionsEl.innerHTML = "";
-      if (!list || list.length === 0) {
+      if (list.length === 0) {
         sessionsEl.innerHTML = '<div class="empty">No running sessions</div>';
       } else {
         for (const s of list) {
           const div = document.createElement("div");
           div.className = "row";
           div.dataset.open = s.id;
+          const stateGlyph = s.state === "starting"
+            ? '<span class="spin" style="margin-right:1px"></span>'
+            : `<span class="dot ${s.state}"></span>`;
           div.innerHTML = `
-            <span class="dot ${s.state}"></span>
+            ${stateGlyph}
             <div class="info">
               <div class="name">${esc(s.label)}</div>
               <div class="meta">:${s.port} · PID ${s.pid} · ${s.state}</div>
@@ -206,30 +300,69 @@
         }
       }
 
-      // configs (not currently running)
+      // workspace info (used by both configs and run targets)
       let info = {};
       try { info = await callWS("Info"); } catch {}
-      const cfgs = info.configs || [];
+      const hasWorkspace = !!info.root;
       const runningCfgIds = new Set((list || []).map(s => s.cfgId));
-      const available = cfgs.filter(c => !runningCfgIds.has(c.id));
-      if (available.length > 0) {
-        launchSection.style.display = "";
-        configsEl.innerHTML = "";
-        for (const cfg of available) {
-          const btn = document.createElement("button");
-          btn.className = "cfg";
-          btn.innerHTML = `<span class="play">${ICONS.play}</span><span>${esc(cfg.label)}</span>`;
-          btn.onclick = () => startCfg(cfg.id);
-          configsEl.appendChild(btn);
-        }
-      } else {
-        launchSection.style.display = "none";
+
+      // debug configs (not currently running)
+      const cfgs = info.configs || [];
+      const availableCfgs = cfgs
+        .filter(c => !runningCfgIds.has(c.id))
+        .sort(recencyCmp(rec, "id"));
+      configsEl.innerHTML = "";
+      for (const cfg of availableCfgs) {
+        configsEl.appendChild(makeLaunchButton({
+          id: cfg.id,
+          label: cfg.label,
+          kind: cfg.mode || "",
+          onClick: () => startCfg(cfg.id),
+        }));
       }
+      debugH.style.display = availableCfgs.length > 0 ? "" : "none";
+
+      // run targets (not currently running)
+      const targets = await fetchTargets(hasWorkspace);
+      const availableTargets = (targets || [])
+        .filter(t => !runningCfgIds.has(t.id))
+        .sort(recencyCmp(rec, "id"));
+      targetsEl.innerHTML = "";
+      for (const t of availableTargets) {
+        targetsEl.appendChild(makeLaunchButton({
+          id: t.id,
+          label: t.label,
+          kind: t.kind || "",
+          onClick: () => launchTarget(t.id),
+        }));
+      }
+      runH.style.display = availableTargets.length > 0 ? "" : "none";
+
+      // hide whole section if both lists empty
+      launchSection.style.display =
+        availableCfgs.length > 0 || availableTargets.length > 0 ? "" : "none";
     }
 
     async function startCfg(id) {
-      try { await callService("SessionService", "Start", id); } catch {}
+      launching.add(id);
       refresh();
+      try {
+        await callService("SessionService", "Start", id);
+      } catch {} finally {
+        launching.delete(id);
+        refresh();
+      }
+    }
+
+    async function launchTarget(id) {
+      launching.add(id);
+      refresh();
+      try {
+        await callDisc("Launch", id);
+      } catch {} finally {
+        launching.delete(id);
+        refresh();
+      }
     }
 
     sessionsEl.addEventListener("click", async (e) => {
@@ -266,6 +399,8 @@
 
     Events.On("tray:sessions-changed", refresh);
     Events.On("session:event", refresh);
+    Events.On("discovery:targets", refresh);
+    Events.On("discovery:done", refresh);
 
     refresh();
   </script>

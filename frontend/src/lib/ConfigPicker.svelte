@@ -4,9 +4,6 @@
   import {
     debugFiles,
     loadDebugFiles,
-    addDebugFile,
-    setDefaultDebugFile,
-    removeDebugFile,
     type DebugFileEntry,
   } from "./settings-store";
   import {
@@ -26,13 +23,20 @@
     selected = 0;
   }
 
-  $: activeFile = $debugFiles.find((f) => f.isDefault);
-  $: items = $debugFiles;
+  $: activeFile = $debugFiles.find((f) => f.path === ($workspace?.root ?? ""));
+  $: items = $debugFiles
+    .slice()
+    .sort((a, b) => {
+      if (!!a.stale !== !!b.stale) return a.stale ? 1 : -1;
+      const at = new Date(a.lastUsed ?? a.addedAt).getTime() || 0;
+      const bt = new Date(b.lastUsed ?? b.addedAt).getTime() || 0;
+      return bt - at;
+    });
 
   function close() { open = false; }
 
   async function selectFile(f: DebugFileEntry) {
-    await setDefaultDebugFile(f.id);
+    if (f.stale) return;
     await openDebugFile(f.path);
     await refreshWorkspace();
     close();
@@ -78,18 +82,22 @@
         <button
           class="item"
           class:sel={i === selected}
-          class:active={f.isDefault}
+          class:active={activeFile?.id === f.id}
+          class:stale={f.stale}
           on:click={() => selectFile(f)}
           on:mouseenter={() => (selected = i)}
         >
           <div class="item-left">
-            {#if f.isDefault}
-              <Icon icon="solar:star-bold" size={12} color="var(--warning)" />
-            {:else}
-              <Icon icon="solar:document-bold" size={12} color="var(--text-faint)" />
-            {/if}
+            <Icon
+              icon={activeFile?.id === f.id ? "solar:check-circle-bold" : "solar:folder-open-bold"}
+              size={12}
+              color={f.stale ? "var(--text-faint)" : (activeFile?.id === f.id ? "var(--success)" : "var(--accent)")}
+            />
             <div class="item-info">
-              <span class="item-label">{f.label}</span>
+              <span class="item-label">
+                {f.label}
+                {#if f.stale}<span class="missing">missing</span>{/if}
+              </span>
               <span class="item-path">{shortPath(f.path)}</span>
             </div>
           </div>
@@ -137,6 +145,9 @@
   }
   .item:hover, .item.sel { background:var(--accent-subtle); }
   .item.active { border-left:2px solid var(--accent); }
+  .item.stale { opacity:0.55; cursor:default; }
+  .item.stale:hover { background:transparent; }
+  .missing { color:var(--danger); font-size:9px; font-family:var(--font-mono); margin-left:6px; padding:0 4px; border:1px solid var(--border-subtle); border-radius:3px; }
   .item-left { display:flex; align-items:center; gap:var(--space-2); flex:1; min-width:0; }
   .item-info { display:flex; flex-direction:column; min-width:0; }
   .item-label { font-size:var(--text-sm); font-weight:500; color:var(--text); }

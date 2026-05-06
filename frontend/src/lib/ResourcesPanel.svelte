@@ -22,7 +22,11 @@
     try {
       appRes = (await SessionService.AppResources()) as any;
       const list = (await SessionService.AllResources()) as any as Res[];
-      sessionRes = list ?? [];
+      // Hide dead sessions (exited / errored). Their PIDs no longer point
+      // to a live process, so reporting them in a resource view is misleading.
+      sessionRes = (list ?? []).filter(
+        (s) => s.state !== "exited" && s.state !== "error",
+      );
     } catch { /* ignore */ }
   }
 

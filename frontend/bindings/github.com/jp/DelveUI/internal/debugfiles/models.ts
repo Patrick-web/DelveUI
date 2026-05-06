@@ -12,12 +12,22 @@ import * as config$0 from "../config/models.js";
 // @ts-ignore: Unused imports
 import * as time$0 from "../../../../../time/models.js";
 
+/**
+ * Entry represents one project. The unit is always a folder; if the project's
+ * launch configs live somewhere outside the standard `.zed`/`.vscode`/
+ * `.delveui` locations (e.g. an externally-shared launch.json), `LaunchFile`
+ * records that explicit override.
+ * 
+ * `Stale` is computed at load — it is true when `Path` no longer exists on
+ * disk. The frontend renders stale entries dimmed with a remove affordance.
+ */
 export class Entry {
     "id": string;
     "path": string;
     "label": string;
-    "isDefault": boolean;
+    "launchFile"?: string;
     "addedAt": time$0.Time;
+    "lastUsed"?: time$0.Time;
     "configs": config$0.LaunchConfig[];
 
     /** Creates a new Entry instance. */
@@ -30,9 +40,6 @@ export class Entry {
         }
         if (!("label" in $$source)) {
             this["label"] = "";
-        }
-        if (!("isDefault" in $$source)) {
-            this["isDefault"] = false;
         }
         if (!("addedAt" in $$source)) {
             this["addedAt"] = null;
@@ -48,10 +55,10 @@ export class Entry {
      * Creates a new Entry instance from a string or object.
      */
     static createFrom($$source: any = {}): Entry {
-        const $$createField5_0 = $$createType1;
+        const $$createField6_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("configs" in $$parsedSource) {
-            $$parsedSource["configs"] = $$createField5_0($$parsedSource["configs"]);
+            $$parsedSource["configs"] = $$createField6_0($$parsedSource["configs"]);
         }
         return new Entry($$parsedSource as Partial<Entry>);
     }

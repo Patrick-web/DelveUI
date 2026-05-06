@@ -1,6 +1,6 @@
 import { writable } from "svelte/store";
 
-export type SidebarTabId = "sessions" | "filetree";
+export type SidebarTabId = "sessions" | "debug" | "run" | "filetree";
 export type CenterTabId = "source" | "terminal" | "console";
 export type InspectorId = "variables" | "watch" | "callstack" | "threads" | "resources";
 
@@ -124,6 +124,8 @@ const INSPECTOR_IDS: ReadonlySet<InspectorId> = new Set([
 const CENTER_IDS: ReadonlySet<CenterTabId> = new Set(["source", "terminal", "console"]);
 const SIDEBAR_IDS: ReadonlySet<SidebarTabId> = new Set([
   "sessions",
+  "debug",
+  "run",
   "filetree",
 ]);
 

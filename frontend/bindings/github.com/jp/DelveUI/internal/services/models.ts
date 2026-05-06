@@ -11,9 +11,6 @@ import * as config$0 from "../config/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as session$0 from "../session/models.js";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as workspace$0 from "../workspace/models.js";
 
 /**
  * CleanResult is returned by CleanDebugBinaries.
@@ -212,7 +209,6 @@ export class WorkspaceInfo {
     "root": string;
     "debugFile": string;
     "configs": config$0.LaunchConfig[];
-    "recents": workspace$0.Recent[];
     "loadedOk": boolean;
     "loadError"?: string;
 
@@ -227,9 +223,6 @@ export class WorkspaceInfo {
         if (!("configs" in $$source)) {
             this["configs"] = [];
         }
-        if (!("recents" in $$source)) {
-            this["recents"] = [];
-        }
         if (!("loadedOk" in $$source)) {
             this["loadedOk"] = false;
         }
@@ -242,13 +235,9 @@ export class WorkspaceInfo {
      */
     static createFrom($$source: any = {}): WorkspaceInfo {
         const $$createField2_0 = $$createType3;
-        const $$createField3_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("configs" in $$parsedSource) {
             $$parsedSource["configs"] = $$createField2_0($$parsedSource["configs"]);
-        }
-        if ("recents" in $$parsedSource) {
-            $$parsedSource["recents"] = $$createField3_0($$parsedSource["recents"]);
         }
         return new WorkspaceInfo($$parsedSource as Partial<WorkspaceInfo>);
     }
@@ -259,5 +248,3 @@ const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = config$0.LaunchConfig.createFrom;
 const $$createType2 = SessionInfo.createFrom;
 const $$createType3 = $Create.Array($$createType1);
-const $$createType4 = workspace$0.Recent.createFrom;
-const $$createType5 = $Create.Array($$createType4);

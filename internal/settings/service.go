@@ -17,6 +17,11 @@ type Settings struct {
 	LineHeight     string `json:"lineHeight"`
 	DlvPath        string `json:"dlvPath"`
 
+	// RestoreLastProject controls the auto-open behavior on launch. When true,
+	// the most-recently-active project is reopened. When false, the user lands
+	// on the welcome page.
+	RestoreLastProject *bool `json:"restoreLastProject,omitempty"`
+
 	LeftPanels     []string `json:"leftPanels"`
 	RightPanels    []string `json:"rightPanels"`
 	DefaultLeftTab  string  `json:"defaultLeftTab"`
@@ -86,6 +91,10 @@ func (s *Service) applyDefaults() {
 	}
 	if s.data.DefaultRightTab == "" {
 		s.data.DefaultRightTab = "terminal"
+	}
+	if s.data.RestoreLastProject == nil {
+		t := true
+		s.data.RestoreLastProject = &t
 	}
 }
 

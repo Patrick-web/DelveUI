@@ -58,11 +58,26 @@ export function IsImported(configPath: string): $CancellablePromise<boolean> {
 }
 
 /**
+ * PickAndScanFolder opens a native folder picker and scans the chosen
+ * directory for editor configs (Zed/VSCode/GoLand). Used by the import UI
+ * to let users add folders by hand alongside the system-wide scan.
+ * 
+ * Returns ProjectPath="" with no editor configs if the user cancelled. A
+ * folder with zero configs returns ProjectPath set but EditorConfigs nil —
+ * the UI surfaces this as "no configs found, open as workspace anyway?".
+ */
+export function PickAndScanFolder(): $CancellablePromise<$models.FolderScanResult> {
+    return $Call.ByID(95908803).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+/**
  * Scan discovers debug configs from known editor locations across the system.
  */
 export function Scan(): $CancellablePromise<$models.DetectedSource[]> {
     return $Call.ByID(1470118857).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
@@ -71,7 +86,7 @@ export function Scan(): $CancellablePromise<$models.DetectedSource[]> {
  */
 export function ScanDir(dir: string): $CancellablePromise<$models.DetectedSource[]> {
     return $Call.ByID(862359768, dir).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
@@ -80,7 +95,7 @@ export function ScanDir(dir: string): $CancellablePromise<$models.DetectedSource
  */
 export function ScanFolder(dir: string): $CancellablePromise<$models.FolderScanResult> {
     return $Call.ByID(2996424521, dir).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType0($result);
     });
 }
 
@@ -89,6 +104,6 @@ export function SetApp(app: application$0.App | null): $CancellablePromise<void>
 }
 
 // Private type creation functions
-const $$createType0 = $models.DetectedSource.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $models.FolderScanResult.createFrom;
+const $$createType0 = $models.FolderScanResult.createFrom;
+const $$createType1 = $models.DetectedSource.createFrom;
+const $$createType2 = $Create.Array($$createType1);

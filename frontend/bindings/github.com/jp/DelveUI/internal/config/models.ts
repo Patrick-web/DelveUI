@@ -21,6 +21,20 @@ export class LaunchConfig {
     "disabledNote"?: string;
     "language"?: string;
 
+    /**
+     * ProcessID is set when Request == "attach". Delve's DAP server expects
+     * it as `processId` in the attach request body.
+     */
+    "processId"?: number;
+
+    /**
+     * EnvFiles records the dotenv files the discovery layer found via walk-up
+     * (outermost → innermost). Their contents are already merged into Env at
+     * launch time; this is preserved purely so the UI can show *which* files
+     * contributed (the env inspector lists them as sources).
+     */
+    "envFiles"?: string[];
+
     /** Creates a new LaunchConfig instance. */
     constructor($$source: Partial<LaunchConfig> = {}) {
         if (!("id" in $$source)) {
@@ -67,6 +81,7 @@ export class LaunchConfig {
         const $$createField8_0 = $$createType0;
         const $$createField9_0 = $$createType1;
         const $$createField10_0 = $$createType1;
+        const $$createField15_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("env" in $$parsedSource) {
             $$parsedSource["env"] = $$createField8_0($$parsedSource["env"]);
@@ -76,6 +91,9 @@ export class LaunchConfig {
         }
         if ("buildFlags" in $$parsedSource) {
             $$parsedSource["buildFlags"] = $$createField10_0($$parsedSource["buildFlags"]);
+        }
+        if ("envFiles" in $$parsedSource) {
+            $$parsedSource["envFiles"] = $$createField15_0($$parsedSource["envFiles"]);
         }
         return new LaunchConfig($$parsedSource as Partial<LaunchConfig>);
     }

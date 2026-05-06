@@ -3,7 +3,9 @@ import { Events } from "@wailsio/runtime";
 import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
 import * as SessionService from "../../bindings/github.com/jp/DelveUI/internal/services/sessionservice";
 import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
+import * as DiscoveryService from "../../bindings/github.com/jp/DelveUI/internal/discovery/service";
 import { wrapHandler } from "./diagnostics";
+import { bumpRecency } from "./recency-store";
 
 export type LaunchConfig = {
   id: string;
@@ -20,6 +22,8 @@ export type LaunchConfig = {
   disabled?: boolean;
   disabledNote?: string;
   language?: string;
+  processId?: number;
+  envFiles?: string[];
 };
 
 export type SessionInfo = {
@@ -29,6 +33,7 @@ export type SessionInfo = {
   state: string;
   port: number;
   pid: number;
+  cfg?: LaunchConfig;
 };
 
 export type StackFrame = {
@@ -50,7 +55,6 @@ export type WorkspaceInfo = {
   root: string;
   debugFile: string;
   configs: LaunchConfig[];
-  recents: { path: string; lastUsed: string }[];
   loadedOk: boolean;
   loadError?: string;
 };
@@ -148,6 +152,12 @@ export async function pickWorkspaceFolder() {
   try {
     const info = (await WorkspaceService.PickWorkspaceFolder()) as any;
     workspace.set(info as WorkspaceInfo);
+    // The backend persists the picked folder as a project entry, so refresh
+    // the project list so the ProjectSwitcher and Welcome page see it.
+    if (info?.root) {
+      const { loadDebugFiles } = await import("./settings-store");
+      await loadDebugFiles().catch(() => {});
+    }
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     const { showError } = await import("./toast");
@@ -166,7 +176,23 @@ export async function openDebugFile(path: string) {
   }
 }
 
+// removeTerminatedForCfg cleans out any old error/exited session entries for
+// the given cfg before a fresh start. Without this, the sessions/sessionState
+// stores would accumulate one ghost per failed retry — invisible (because
+// SessionsPanel only renders the latest session per cfgId), but kept in
+// memory and confusing to debug.
+function removeTerminatedForCfg(cfgId: string) {
+  if (!cfgId) return;
+  for (const s of Object.values(get(sessions))) {
+    if (s.cfgId === cfgId && (s.state === "error" || s.state === "exited")) {
+      removeSession(s.id);
+    }
+  }
+}
+
 export async function startSession(cfgId: string) {
+  removeTerminatedForCfg(cfgId);
+  bumpRecency(cfgId);
   try {
     const result = (await SessionService.Start(cfgId)) as any;
     const s = result.session as SessionInfo;
@@ -195,6 +221,8 @@ export async function startSession(cfgId: string) {
 }
 
 export async function restartSession(id: string) {
+  const prev = get(sessions)[id];
+  bumpRecency(prev?.cfgId);
   try {
     removeSession(id);
     const result = (await SessionService.Restart(id)) as any;
@@ -220,6 +248,19 @@ export async function restartSession(id: string) {
 
 export async function stopSession(id: string) {
   await SessionService.Stop(id);
+  removeSession(id);
+}
+
+// Dismiss a terminated session from the UI. Used by the Sessions / Run panels
+// when the user is done inspecting a failed or exited session. For sessions
+// that are still running we route through stopSession instead, so we don't
+// orphan a live dlv process in the manager.
+export async function dismissSession(id: string) {
+  const s = get(sessions)[id];
+  if (s && (s.state === "running" || s.state === "stopped" || s.state === "starting")) {
+    await stopSession(id);
+    return;
+  }
   removeSession(id);
 }
 
@@ -265,6 +306,107 @@ export async function control(
   id: string,
 ) {
   await (SessionService as any)[action](id);
+}
+
+// --- Discovery: auto-discovered run/test/attach targets ---
+
+export type RunTarget = {
+  id: string;
+  provider: string;
+  kind: "run" | "test" | "benchmark" | "example" | "attach" | string;
+  label: string;
+  description?: string;
+  dir: string;
+  program: string;
+  args?: string[];
+  env?: Record<string, string>;
+  envFiles?: string[];
+  pid?: number;
+  sourceFile?: string;
+  sourceLine?: number;
+};
+
+export const runTargets = writable<RunTarget[]>([]);
+export const targetsLoading = writable<boolean>(false);
+export const targetsLastScanned = writable<Date | null>(null);
+
+export async function refreshTargets() {
+  try {
+    targetsLoading.set(true);
+    const list = (await DiscoveryService.Refresh()) as any as RunTarget[];
+    runTargets.set(list ?? []);
+    targetsLastScanned.set(new Date());
+  } catch (e: any) {
+    const msg = String(e?.message ?? e);
+    // "no workspace open" is the only expected error path; show a quieter
+    // notice rather than an error toast so users opening DelveUI for the
+    // first time aren't startled.
+    if (!/no workspace open/i.test(msg)) {
+      const { showError } = await import("./toast");
+      showError("Failed to discover run targets", msg);
+    }
+  } finally {
+    targetsLoading.set(false);
+  }
+}
+
+// Discovery-launched sessions are virtual (no entry in workspace.configs), so
+// the session:event handler skips registering them in the sessions store. We
+// register them ourselves from the launch result, mirroring how startSession
+// handles SessionService.Start.
+function registerLaunchedSession(result: any, errorTitle: string) {
+  if (result?.error) {
+    import("./toast").then(({ showError }) => showError(errorTitle, result.error, result?.sessionId));
+  }
+  const sid = result?.sessionId as string | undefined;
+  if (!sid) return undefined;
+  removeTerminatedForCfg(result?.cfgId ?? "");
+  const info: SessionInfo = {
+    id: sid,
+    cfgId: result.cfgId ?? "",
+    label: result.label ?? "",
+    state: result.state || "starting",
+    port: result.port ?? 0,
+    pid: result.pid ?? 0,
+    cfg: result.cfg as LaunchConfig | undefined,
+  };
+  sessions.update((m) => ({ ...m, [sid]: info }));
+  activeSessionId.set(sid);
+  // ensureSession is only called from the session:event handler normally; do
+  // it here so panes that depend on per-session state can render right away.
+  sessionState.update((m) => {
+    if (!m[sid]) m[sid] = { output: [], stack: [], stoppedThread: 0, breakpoints: {} };
+    return m;
+  });
+  sendBreakpointsToSession(sid).catch(() => {});
+  // Switch to terminal so output is visible.
+  import("./panels/layout").then(({ setActivePanel }) => {
+    setActivePanel("right", "terminal");
+  });
+  return sid;
+}
+
+export async function launchTarget(targetId: string) {
+  bumpRecency(targetId);
+  try {
+    const result = (await DiscoveryService.Launch(targetId)) as any;
+    return registerLaunchedSession(result, "Failed to launch target");
+  } catch (e: any) {
+    const { showError } = await import("./toast");
+    showError("Failed to launch target", String(e?.message ?? e));
+    throw e;
+  }
+}
+
+export async function attachToProcess(pid: number) {
+  try {
+    const result = (await DiscoveryService.LaunchProcess(pid)) as any;
+    return registerLaunchedSession(result, `Failed to attach to PID ${pid}`);
+  } catch (e: any) {
+    const { showError } = await import("./toast");
+    showError(`Failed to attach to PID ${pid}`, String(e?.message ?? e));
+    throw e;
+  }
 }
 
 // Global breakpoints store — persists independently of sessions
@@ -391,15 +533,27 @@ Events.On("session:event", wrapHandler("session:event", async (ev: any) => {
     return m;
   });
   if (e.kind === "error" && e.message) {
+    // Mirror the error into the session output so it shows up in both the
+    // Terminal panel (cat-filter accepts "important") and the Debug Console
+    // (which whitelists "important"). A toast alone is too easy to miss.
+    sessionState.update((m) => {
+      ensureSession(e.sessionId);
+      m[e.sessionId].output.push({
+        cat: "important",
+        text: `[error] ${e.message}\n`,
+      });
+      return { ...m };
+    });
     const { showError } = await import("./toast");
-    showError("Debug session error", e.message);
+    showError("Debug session error", e.message, e.sessionId);
     return;
   }
   if (e.kind === "state" && e.state) {
-    if (e.state === "exited" || e.state === "error") {
-      setTimeout(() => removeSession(e.sessionId), 1500);
-      return;
-    }
+    // Terminated sessions used to be auto-removed after 1.5s, but that wiped
+    // their output before the user could inspect it (and broke the "Show in
+    // Debug Console" toast action, which set activeSessionId to a session
+    // that no longer existed). Now we always just update state and let the
+    // user dismiss terminated sessions explicitly via the panels.
     sessions.update((m) => {
       if (m[e.sessionId]) m[e.sessionId] = { ...m[e.sessionId], state: e.state! };
       return m;

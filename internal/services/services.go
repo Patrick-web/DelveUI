@@ -14,24 +14,23 @@ import (
 
 	"github.com/jp/DelveUI/internal/config"
 	"github.com/jp/DelveUI/internal/debugclean"
+	"github.com/jp/DelveUI/internal/debugfiles"
 	"github.com/jp/DelveUI/internal/session"
-	"github.com/jp/DelveUI/internal/workspace"
 )
 
-// WorkspaceService is exposed to the frontend: open workspace, list configs, recents.
+// WorkspaceService is exposed to the frontend: open workspace, list configs.
 type WorkspaceService struct {
-	store     *workspace.Store
+	dbgStore  *debugfiles.Store
 	configs   []config.LaunchConfig
 	root      string
 	debugFile string
 	app       *application.App
 }
 
-func NewWorkspaceService(store *workspace.Store) *WorkspaceService {
-	s := &WorkspaceService{store: store}
-	if p := store.ActivePath(); p != "" {
-		_ = s.loadPath(p)
-	}
+// NewWorkspaceService wires the workspace handling. Active project state and
+// recents both live in `dbgStore` now — there is no separate workspace store.
+func NewWorkspaceService(dbgStore *debugfiles.Store) *WorkspaceService {
+	s := &WorkspaceService{dbgStore: dbgStore}
 	return s
 }
 
@@ -42,7 +41,6 @@ type WorkspaceInfo struct {
 	Root      string                `json:"root"`
 	DebugFile string                `json:"debugFile"`
 	Configs   []config.LaunchConfig `json:"configs"`
-	Recents   []workspace.Recent    `json:"recents"`
 	LoadedOK  bool                  `json:"loadedOk"`
 	LoadError string                `json:"loadError,omitempty"`
 }
@@ -59,13 +57,15 @@ func (s *WorkspaceService) ClearWorkspace() {
 }
 
 func (s *WorkspaceService) Info() WorkspaceInfo {
-	info := WorkspaceInfo{Root: s.root, DebugFile: s.debugFile, Configs: s.configs, Recents: s.store.List()}
+	info := WorkspaceInfo{Root: s.root, DebugFile: s.debugFile, Configs: s.configs}
 	info.LoadedOK = len(s.configs) > 0 || (s.root == "" && s.debugFile == "")
 	return info
 }
 
 // OpenWorkspace accepts either a directory (auto-discovers .zed/debug.json)
-// or a path to a debug.json file directly.
+// or a path to a debug.json file directly. The picked path is registered as a
+// project entry (idempotent on folder path) and bumped to the top of the MRU
+// list so the next launch can restore it.
 func (s *WorkspaceService) OpenWorkspace(path string) (WorkspaceInfo, error) {
 	if err := s.loadPath(path); err != nil {
 		return s.Info(), err
@@ -74,8 +74,23 @@ func (s *WorkspaceService) OpenWorkspace(path string) (WorkspaceInfo, error) {
 	if remember == "" {
 		remember = s.debugFile
 	}
-	if err := s.store.SetActive(remember); err != nil {
-		return s.Info(), err
+	if s.dbgStore != nil && remember != "" {
+		// Add() normalizes file paths to a folder-kind entry and is a no-op
+		// when the project is already registered, so we can call it on every
+		// open without worrying about duplicates.
+		if _, addErr := s.dbgStore.Add(remember); addErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: register project %q: %v\n", remember, addErr)
+		}
+		// MarkActive is keyed by the folder path; for file imports we still
+		// want the folder to be the MRU entry, so resolve through Add's view.
+		folderPath := remember
+		if info, err := os.Stat(remember); err == nil && !info.IsDir() {
+			folderPath = filepath.Dir(remember)
+			if base := filepath.Base(folderPath); base == ".zed" || base == ".vscode" || base == ".delveui" {
+				folderPath = filepath.Dir(folderPath)
+			}
+		}
+		_ = s.dbgStore.MarkActive(folderPath)
 	}
 	return s.Info(), nil
 }
@@ -131,22 +146,30 @@ func (s *WorkspaceService) PickWorkspaceFolder() (WorkspaceInfo, error) {
 	if path == "" {
 		return s.Info(), nil
 	}
+	// OpenWorkspace registers the folder as a project entry on its own.
 	return s.OpenWorkspace(path)
 }
 
 // loadPath accepts a directory (→ looks for .zed/debug.json) or a debug.json file path.
 func (s *WorkspaceService) loadPath(path string) error {
+	// Expand shell-style and editor template variables at the boundary so a
+	// recents/active path stored with `${userHome}` (or `~/`) is usable here.
+	path = config.ExpandPath(path, "")
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 	if info.IsDir() {
 		dbg, cfgs, err := config.LoadFromWorkspace(path)
+		// A folder without any debug config file is still a valid workspace —
+		// the discovery service will populate run/test targets from Go source.
+		// This matches VS Code's "Open Folder" behaviour: pick any folder, get
+		// editing+debugging UX whether or not a launch.json exists.
 		if err != nil {
 			s.root = path
-			s.debugFile = dbg
+			s.debugFile = ""
 			s.configs = nil
-			return err
+			return nil
 		}
 		s.root = path
 		s.debugFile = dbg

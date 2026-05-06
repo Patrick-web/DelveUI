@@ -104,6 +104,29 @@ func (s *Service) ScanFolder(dir string) FolderScanResult {
 	return result
 }
 
+// PickAndScanFolder opens a native folder picker and scans the chosen
+// directory for editor configs (Zed/VSCode/GoLand). Used by the import UI
+// to let users add folders by hand alongside the system-wide scan.
+//
+// Returns ProjectPath="" with no editor configs if the user cancelled. A
+// folder with zero configs returns ProjectPath set but EditorConfigs nil —
+// the UI surfaces this as "no configs found, open as workspace anyway?".
+func (s *Service) PickAndScanFolder() (FolderScanResult, error) {
+	if s.app == nil {
+		return FolderScanResult{}, fmt.Errorf("app not initialized")
+	}
+	dialog := s.app.Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
+		Title:                "Choose folder to scan for debug configs",
+		CanChooseFiles:       false,
+		CanChooseDirectories: true,
+	})
+	path, err := dialog.PromptForSingleSelection()
+	if err != nil || path == "" {
+		return FolderScanResult{}, err
+	}
+	return s.ScanFolder(path), nil
+}
+
 // CreateConfigFromTargets writes a synthetic debug.json from run targets and imports it.
 func (s *Service) CreateConfigFromTargets(projectDir string, targets []RunTarget) error {
 	if len(targets) == 0 {

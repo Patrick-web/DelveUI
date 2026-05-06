@@ -175,9 +175,23 @@ func (c *Client) Initialize(clientID string) (*dap.InitializeResponse, error) {
 
 // Launch sends a raw launch with the given args map (Delve-specific keys like program/cwd/env).
 func (c *Client) Launch(args map[string]any) error {
+	return c.sendRawRequest("launch", args)
+}
+
+// Attach sends an attach request — used when connecting to a running process
+// rather than spawning one. Delve expects `processId` and `mode: local`.
+func (c *Client) Attach(args map[string]any) error {
+	return c.sendRawRequest("attach", args)
+}
+
+func (c *Client) sendRawRequest(command string, args map[string]any) error {
 	body, _ := json.Marshal(args)
+	// Both LaunchRequest and AttachRequest use json.RawMessage for Arguments;
+	// since they have identical wire shape we can route both through
+	// LaunchRequest with Command swapped — saves duplicating the response
+	// plumbing for ErrorResponse decoding.
 	req := &dap.LaunchRequest{
-		Request:   dap.Request{ProtocolMessage: dap.ProtocolMessage{Type: "request"}, Command: "launch"},
+		Request:   dap.Request{ProtocolMessage: dap.ProtocolMessage{Type: "request"}, Command: command},
 		Arguments: body,
 	}
 	resp, err := c.Send(req)
@@ -190,12 +204,11 @@ func (c *Client) Launch(args map[string]any) error {
 			if er.Body.Error.Format != "" {
 				detail = er.Body.Error.Format
 			}
-			// substitute {variables} from Variables map
 			for k, v := range er.Body.Error.Variables {
 				detail = strings.ReplaceAll(detail, "{"+k+"}", v)
 			}
 		}
-		return fmt.Errorf("launch failed: %s (args: %s)", detail, string(body))
+		return fmt.Errorf("%s failed: %s (args: %s)", command, detail, string(body))
 	}
 	return nil
 }

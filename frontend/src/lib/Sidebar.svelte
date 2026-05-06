@@ -1,18 +1,45 @@
 <script lang="ts">
   import { layout, setSidebarActive, toggleBreakpointsDrawer, setBreakpointsExpanded, type SidebarTabId } from "./panels/layout";
-  import { globalBreakpoints, activeSessionId, setBreakpoints } from "./store";
+  import { globalBreakpoints, activeSessionId, setBreakpoints, workspace } from "./store";
   import SessionsPanel from "./SessionsPanel.svelte";
+  import DebugPanel from "./DebugPanel.svelte";
+  import RunTargetsPanel from "./RunTargetsPanel.svelte";
   import FileTreePanel from "./FileTreePanel.svelte";
   import BreakpointsPanel from "./BreakpointsPanel.svelte";
   import Icon from "./Icon.svelte";
 
   const tabs: { id: SidebarTabId; label: string }[] = [
     { id: "sessions", label: "Sessions" },
+    { id: "debug", label: "Debug" },
+    { id: "run", label: "Run" },
     { id: "filetree", label: "Files" },
   ];
 
   $: active = $layout.sidebarActive;
   $: bpExpanded = $layout.breakpointsExpanded;
+
+  // Auto-switch to the Run tab when the workspace has no debug configs but
+  // does have a root (i.e. opened via "Open Folder" — no launch.json). The
+  // user otherwise lands on an empty Debug tab and has to discover Run on
+  // their own. Only flips when on Sessions/Debug so we don't override an
+  // explicit user choice mid-session.
+  let didAutoSwitch = false;
+  $: {
+    const hasRoot = !!$workspace?.root;
+    const hasConfigs = ($workspace?.configs?.length ?? 0) > 0;
+    if (
+      hasRoot &&
+      !hasConfigs &&
+      (active === "sessions" || active === "debug") &&
+      !didAutoSwitch
+    ) {
+      didAutoSwitch = true;
+      setSidebarActive("run");
+    }
+    // Reset the latch when configs become available so a future folder-open
+    // (with no configs) gets the auto-switch again.
+    if (hasConfigs) didAutoSwitch = false;
+  }
 
   $: bpCount = Object.values($globalBreakpoints).reduce(
     (n, lines) => n + (lines?.length ?? 0),
@@ -57,6 +84,12 @@
   <div class="body">
     <div class="pane" hidden={active !== "sessions"}>
       <SessionsPanel />
+    </div>
+    <div class="pane" hidden={active !== "debug"}>
+      <DebugPanel />
+    </div>
+    <div class="pane" hidden={active !== "run"}>
+      <RunTargetsPanel />
     </div>
     <div class="pane" hidden={active !== "filetree"}>
       <FileTreePanel hideHeader />

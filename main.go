@@ -15,13 +15,14 @@ import (
 
 	"github.com/jp/DelveUI/internal/debugfiles"
 	"github.com/jp/DelveUI/internal/detect"
+	"github.com/jp/DelveUI/internal/discovery"
+	"github.com/jp/DelveUI/internal/discovery/goprovider"
 	"github.com/jp/DelveUI/internal/services"
 	"github.com/jp/DelveUI/internal/session"
 	"github.com/jp/DelveUI/internal/settings"
 	"github.com/jp/DelveUI/internal/themes"
 	"github.com/jp/DelveUI/internal/tray"
 	"github.com/jp/DelveUI/internal/updater"
-	"github.com/jp/DelveUI/internal/workspace"
 )
 
 var version = "dev"
@@ -34,10 +35,6 @@ func main() {
 	flag.StringVar(&initialProject, "project", "", "path to debug.json or project root to open on launch")
 	flag.Parse()
 
-	store, err := workspace.NewStore()
-	if err != nil {
-		log.Fatal(err)
-	}
 	mgr, err := session.NewManager()
 	if err != nil {
 		log.Printf("warning: %v", err)
@@ -66,21 +63,36 @@ func main() {
 	updateSvc := updater.NewService(version)
 	detectSvc := detect.NewService(dbgFiles)
 
-	wsSvc := services.NewWorkspaceService(store)
+	wsSvc := services.NewWorkspaceService(dbgFiles)
 	sessSvc := services.NewSessionService(mgr, wsSvc)
 	fileSvc := services.NewFileService()
 
+	// Discovery: pluggable run/test/attach target detection. Providers register
+	// themselves explicitly here so the import graph stays self-documenting —
+	// adding a new language is one Register() call.
+	discoveryReg := discovery.NewRegistry()
+	discoveryReg.Register(goprovider.New())
+	discoverySvc := discovery.NewService(discoveryReg, wsSvc, mgr)
+
 	// Initial workspace priority:
 	//   1. --project flag       (explicit override, used when spawning a new window)
-	//   2. last active project  (already loaded by NewWorkspaceService from workspaces.json)
-	//   3. default debug file   (first-run / nothing-restored fallback)
+	//   2. most-recent project  (when the restoreLastProject setting is on)
+	//
+	// Without a restored or explicit project, the welcome page handles
+	// onboarding so we leave wsSvc untouched.
 	if initialProject != "" {
 		if _, err := wsSvc.OpenDebugFile(initialProject); err != nil {
 			log.Printf("warning: --project %q: %v", initialProject, err)
 		}
-	} else if wsSvc.DebugFile() == "" {
-		if def := dbgFiles.GetDefault(); def != nil {
-			_, _ = wsSvc.OpenDebugFile(def.Path)
+	} else if wsSvc.Root() == "" {
+		restore := true
+		if cur := settingsSvc.Get(); cur.RestoreLastProject != nil {
+			restore = *cur.RestoreLastProject
+		}
+		if restore {
+			if recent := dbgFiles.MostRecent(); recent != nil && !recent.Stale {
+				_, _ = wsSvc.OpenWorkspace(recent.Path)
+			}
 		}
 	}
 
@@ -96,6 +108,7 @@ func main() {
 			application.NewService(dbgFiles),
 			application.NewService(updateSvc),
 			application.NewService(detectSvc),
+			application.NewService(discoverySvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -127,6 +140,7 @@ func main() {
 
 	wsSvc.SetApp(app)
 	detectSvc.SetApp(app)
+	discoverySvc.SetApp(app)
 	updateSvc.SetApp(app)
 
 	trayCtrl := tray.New(app, win, wsSvc, sessSvc, mgr)

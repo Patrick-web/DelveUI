@@ -9,6 +9,19 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+/**
+ * ActivePath returns the most-recently-loaded project path, used by the app
+ * to restore state on launch.
+ */
+export function ActivePath(): $CancellablePromise<string> {
+    return $Call.ByID(2001680632);
+}
+
+/**
+ * Add registers a path as a project. Accepts either a folder or a launch.json
+ * file path — both normalize to a folder-kind entry. Idempotent: repeated
+ * calls for the same resolved folder bump LastUsed instead of inserting.
+ */
 export function Add(path: string): $CancellablePromise<$models.Entry> {
     return $Call.ByID(749921156, path).then(($result: any) => {
         return $$createType0($result);
@@ -16,21 +29,45 @@ export function Add(path: string): $CancellablePromise<$models.Entry> {
 }
 
 /**
- * Clear removes every registered debug file entry.
+ * Clear removes every registered project entry.
  */
 export function Clear(): $CancellablePromise<void> {
     return $Call.ByID(435842770);
 }
 
-export function GetDefault(): $CancellablePromise<$models.Entry | null> {
-    return $Call.ByID(1386815440).then(($result: any) => {
+export function List(): $CancellablePromise<$models.Entry[]> {
+    return $Call.ByID(496274225).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
-export function List(): $CancellablePromise<$models.Entry[]> {
-    return $Call.ByID(496274225).then(($result: any) => {
+/**
+ * MarkActive sets Active and updates LastUsed for the matching entry. Path is
+ * matched by exact equality with Entry.Path; callers should pass the folder
+ * path, not a launch.json file path.
+ */
+export function MarkActive(path: string): $CancellablePromise<void> {
+    return $Call.ByID(3247689242, path);
+}
+
+/**
+ * MostRecent returns the entry to load when restoring the last session. Picks
+ * the entry with the largest LastUsed (falling back to AddedAt). Returns nil
+ * when there are no entries.
+ */
+export function MostRecent(): $CancellablePromise<$models.Entry | null> {
+    return $Call.ByID(799555785).then(($result: any) => {
         return $$createType2($result);
+    });
+}
+
+/**
+ * Recent returns up to `limit` entries ordered by recency. Used by the
+ * frontend to render an MRU list on the welcome page.
+ */
+export function Recent(limit: number): $CancellablePromise<$models.Entry[]> {
+    return $Call.ByID(86871246, limit).then(($result: any) => {
+        return $$createType1($result);
     });
 }
 
@@ -46,11 +83,15 @@ export function Remove(id: string): $CancellablePromise<void> {
     return $Call.ByID(250174573, id);
 }
 
-export function SetDefault(id: string): $CancellablePromise<void> {
-    return $Call.ByID(4003068100, id);
+/**
+ * RemoveStale drops every entry whose Path no longer exists on disk. Returns
+ * the number of entries removed; 0 when everything is healthy.
+ */
+export function RemoveStale(): $CancellablePromise<number> {
+    return $Call.ByID(2199235974);
 }
 
 // Private type creation functions
 const $$createType0 = $models.Entry.createFrom;
-const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = $Create.Array($$createType0);
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = $Create.Nullable($$createType0);

@@ -144,21 +144,49 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 		return fmt.Errorf("initialize: %w", err)
 	}
 
+	isAttach := s.Cfg.Request == "attach"
 	launchArgs := map[string]any{
 		"request":    s.Cfg.Request,
 		"mode":       s.Cfg.Mode,
-		"program":    s.Cfg.Program,
-		"cwd":        s.Cfg.Cwd,
 		"name":       s.Cfg.Label,
 		"type":       "go",
 		"args":       s.Cfg.Args,
 		"buildFlags": strings.Join(s.Cfg.BuildFlags, " "),
 	}
-	if env, err := config.LoadEnvFile(s.Cfg.EnvFile); err == nil && env != nil {
+	if isAttach {
+		// Delve attach: cwd is still used to resolve relative source paths,
+		// but `program` is ignored — `processId` drives everything.
+		launchArgs["processId"] = s.Cfg.ProcessID
+		if s.Cfg.Cwd != "" {
+			launchArgs["cwd"] = s.Cfg.Cwd
+		}
+		// Default mode for attach is "local" (vs "remote"); preserve any
+		// explicit override the user/discovery layer set.
+		if s.Cfg.Mode == "" {
+			launchArgs["mode"] = "local"
+		}
+	} else {
+		launchArgs["program"] = s.Cfg.Program
+		launchArgs["cwd"] = s.Cfg.Cwd
+	}
+
+	// Env precedence: explicit cfg.Env (already includes merged walk-up env
+	// files when set by the discovery service) wins; falls back to legacy
+	// EnvFile field for hand-written configs that point at a single file.
+	if len(s.Cfg.Env) > 0 {
+		launchArgs["env"] = s.Cfg.Env
+	} else if env, err := config.LoadEnvFile(s.Cfg.EnvFile); err == nil && env != nil {
 		launchArgs["env"] = env
 	}
-	if err := client.Launch(launchArgs); err != nil {
-		return err
+
+	var launchErr error
+	if isAttach {
+		launchErr = client.Attach(launchArgs)
+	} else {
+		launchErr = client.Launch(launchArgs)
+	}
+	if launchErr != nil {
+		return launchErr
 	}
 	// Wait for InitializedEvent before returning so the frontend can set
 	// breakpoints during the DAP configuration phase. The frontend explicitly

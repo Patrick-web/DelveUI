@@ -10,6 +10,11 @@ export type AppSettings = {
   bufferFontSize: number;
   termFontSize: number;
   lineHeight: string;
+  dlvPath?: string;
+  // restoreLastProject controls whether the most-recently-active project is
+  // reopened on launch. Defaults to true. Backend uses *bool so the JSON file
+  // can omit it; frontend treats undefined as true.
+  restoreLastProject?: boolean;
   leftPanels: string[];
   rightPanels: string[];
   defaultLeftTab: string;
@@ -20,9 +25,17 @@ export type DebugFileEntry = {
   id: string;
   path: string;
   label: string;
-  isDefault: boolean;
+  // launchFile is set only when the entry was originally registered by
+  // pointing at a launch.json that lives outside .zed/.vscode/.delveui — it
+  // overrides folder-walk discovery. Empty/undefined means the standard
+  // folder lookup is used.
+  launchFile?: string;
   addedAt: string;
+  lastUsed?: string;
   configs: any[];
+  // stale = true when the path no longer exists on disk; backend marks this
+  // at load time. Frontend dims the row and offers a remove action.
+  stale?: boolean;
 };
 
 export const appSettings = writable<AppSettings>({
@@ -33,6 +46,7 @@ export const appSettings = writable<AppSettings>({
   bufferFontSize: 13,
   termFontSize: 12,
   lineHeight: "standard",
+  restoreLastProject: true,
   leftPanels: ["breakpoints", "callstack", "threads", "variables", "resources"],
   rightPanels: ["terminal", "console"],
   defaultLeftTab: "breakpoints",
@@ -99,12 +113,16 @@ export async function removeDebugFile(id: string) {
   }
 }
 
-export async function setDefaultDebugFile(id: string) {
+// removeStaleDebugFiles drops every entry whose folder is missing on disk.
+// Returns the number removed so the UI can confirm with the user.
+export async function removeStaleDebugFiles(): Promise<number> {
   try {
-    await DebugFilesStore.SetDefault(id);
+    const n = (await DebugFilesStore.RemoveStale()) as any as number;
     await loadDebugFiles();
+    return n ?? 0;
   } catch (e) {
-    console.error("Failed to set default:", e);
+    console.error("Failed to remove stale entries:", e);
+    return 0;
   }
 }
 
