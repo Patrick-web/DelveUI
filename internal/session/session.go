@@ -6,12 +6,14 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	godap "github.com/google/go-dap"
 
+	"github.com/jp/DelveUI/internal/adapter"
 	"github.com/jp/DelveUI/internal/config"
 	"github.com/jp/DelveUI/internal/dap"
 	"github.com/jp/DelveUI/internal/debugclean"
@@ -90,7 +92,7 @@ func (s *Session) StoppedThread() int {
 	return s.stopped.ThreadID
 }
 
-func (s *Session) start(ctx context.Context, dlvPath string) error {
+func (s *Session) start(ctx context.Context, spec adapter.ProcessSpec) error {
 	s.setState(StateStarting)
 	s.initialized = make(chan struct{})
 
@@ -100,20 +102,27 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 	}
 	s.Port = port
 
-	args := []string{"dap", "--listen", fmt.Sprintf("127.0.0.1:%d", port)}
-	cmd := exec.CommandContext(ctx, dlvPath, args...)
+	args := append([]string{}, spec.BinaryArgs...)
+	flag := spec.PortFlag
+	if flag == "" {
+		flag = "--listen $HOST:$PORT"
+	}
+	flag = strings.ReplaceAll(flag, "$HOST", "127.0.0.1")
+	flag = strings.ReplaceAll(flag, "$PORT", strconv.Itoa(port))
+	args = append(args, strings.Fields(flag)...)
+	cmd := exec.CommandContext(ctx, spec.Binary, args...)
 	if s.Cfg.Cwd != "" {
 		cmd.Dir = s.Cfg.Cwd
 	} else if s.Cfg.Program != "" {
 		cmd.Dir = s.Cfg.Program
 	}
 	cmd.SysProcAttr = processSysProcAttr()
-	cmd.Env = enrichedEnv()
-	cmd.Stdout = logWriter{s: s, cat: "dlv-stdout"}
-	cmd.Stderr = logWriter{s: s, cat: "dlv-stderr"}
+	cmd.Env = enrichedEnv(spec.ExtraPath)
+	cmd.Stdout = logWriter{s: s, cat: fmt.Sprintf("%s-stdout", spec.Language)}
+	cmd.Stderr = logWriter{s: s, cat: fmt.Sprintf("%s-stderr", spec.Language)}
 	if err := cmd.Start(); err != nil {
 		s.setState(StateError)
-		return fmt.Errorf("start dlv: %w", err)
+		return fmt.Errorf("start %s adapter: %w", spec.Language, err)
 	}
 	s.cmd = cmd
 	s.PID = cmd.Process.Pid
@@ -121,11 +130,13 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 	workDir := cmd.Dir
 	go func() {
 		err := cmd.Wait()
-		if removed, _ := debugclean.CleanDir(workDir); len(removed) > 0 {
-			s.emit(Event{Kind: "output", Category: "console",
-				Output: fmt.Sprintf("[delveui] cleaned %d debug binary file(s)\n", len(removed))})
+		if spec.Language == "go" {
+			if removed, _ := debugclean.CleanDir(workDir); len(removed) > 0 {
+				s.emit(Event{Kind: "output", Category: "console",
+					Output: fmt.Sprintf("[delveui] cleaned %d debug binary file(s)\n", len(removed))})
+			}
 		}
-		s.emit(Event{Kind: "exited", Message: fmt.Sprintf("dlv exited: %v", err)})
+		s.emit(Event{Kind: "exited", Message: fmt.Sprintf("%s adapter exited: %v", spec.Language, err)})
 		s.setState(StateExited)
 	}()
 
@@ -140,7 +151,7 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 	s.client = client
 	go s.eventLoop()
 
-	if _, err := client.Initialize("delveui"); err != nil {
+	if _, err := client.Initialize("delveui", spec.AdapterID); err != nil {
 		return fmt.Errorf("initialize: %w", err)
 	}
 
@@ -149,7 +160,7 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 		"request":    s.Cfg.Request,
 		"mode":       s.Cfg.Mode,
 		"name":       s.Cfg.Label,
-		"type":       "go",
+		"type":       spec.DAPType,
 		"args":       s.Cfg.Args,
 		"buildFlags": strings.Join(s.Cfg.BuildFlags, " "),
 	}
@@ -196,13 +207,13 @@ func (s *Session) start(ctx context.Context, dlvPath string) error {
 	case <-time.After(10 * time.Second):
 		return fmt.Errorf("timeout waiting for DAP InitializedEvent")
 	}
-	s.emit(Event{Kind: "output", Category: "console", Output: fmt.Sprintf("[delveui] Launched %s (program=%s, mode=%s) on dlv port %d\n", s.Cfg.Label, s.Cfg.Program, s.Cfg.Mode, s.Port)})
+	s.emit(Event{Kind: "output", Category: "console", Output: fmt.Sprintf("[delveui] Launched %s (program=%s, mode=%s, adapter=%s) on port %d\n", s.Cfg.Label, s.Cfg.Program, s.Cfg.Mode, spec.Language, s.Port)})
 	s.setState(StateRunning)
 	return nil
 }
 
-// ConfigurationDone tells dlv we're finished configuring (breakpoints, etc.)
-// so it can resume the program. Idempotent.
+// ConfigurationDone tells the DAP server we're finished configuring
+// (breakpoints, etc.) so it can resume the program. Idempotent.
 func (s *Session) ConfigurationDone() error {
 	if s.client == nil {
 		return fmt.Errorf("session not running")
@@ -227,7 +238,7 @@ func (s *Session) eventLoop() {
 			s.mu.Unlock()
 			s.emit(Event{Kind: "stopped", ThreadID: ev.Body.ThreadId, Reason: ev.Body.Reason, State: StateStopped})
 		case *godap.InitializedEvent:
-			// Delve is in the configuration phase. Signal start() so it can
+			// The adapter is in the configuration phase. Signal start() so it can
 			// return; the frontend will send breakpoints and then explicitly
 			// call ConfigurationDone via SessionService.
 			if s.initialized != nil {
@@ -273,30 +284,28 @@ func (w logWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// enrichedEnv returns the current env with common Go/bin paths added to PATH.
-// macOS .app bundles have a minimal PATH; this ensures `go`, `dlv`, etc. are reachable.
-func enrichedEnv() []string {
+// enrichedEnv returns the current env with additional paths appended to PATH.
+// macOS .app bundles have a minimal PATH; this ensures adapter toolchains
+// (go, python, node, …) are reachable.
+func enrichedEnv(extraPaths []string) []string {
 	env := os.Environ()
 	home, _ := os.UserHomeDir()
-	extraPaths := []string{
+	paths := []string{
 		"/usr/local/bin",
 		"/opt/homebrew/bin",
-		"/usr/local/go/bin",
 	}
 	if home != "" {
-		extraPaths = append(extraPaths, home+"/go/bin", home+"/.local/bin", home+"/bin")
+		paths = append(paths, home+"/.local/bin", home+"/bin")
 	}
-	if gp := os.Getenv("GOPATH"); gp != "" {
-		extraPaths = append(extraPaths, gp+"/bin")
-	}
+	paths = append(paths, extraPaths...)
 
 	for i, e := range env {
 		if strings.HasPrefix(e, "PATH=") {
-			env[i] = e + ":" + strings.Join(extraPaths, ":")
+			env[i] = e + ":" + strings.Join(paths, ":")
 			return env
 		}
 	}
-	env = append(env, "PATH="+strings.Join(extraPaths, ":"))
+	env = append(env, "PATH="+strings.Join(paths, ":"))
 	return env
 }
 

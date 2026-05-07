@@ -1,0 +1,12 @@
+[
+  {
+    "adapter": "debugpy",
+    "label": "Debug main.py",
+    "type": "python",
+    "request": "launch",
+    "mode": "debug",
+    "program": "main.py",
+    "cwd": ".",
+    "language": "python"
+  }
+]

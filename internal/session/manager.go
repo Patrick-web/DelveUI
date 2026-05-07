@@ -3,12 +3,11 @@ package session
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"sync"
 
 	"github.com/google/uuid"
 
+	"github.com/jp/DelveUI/internal/adapter"
 	"github.com/jp/DelveUI/internal/config"
 )
 
@@ -16,53 +15,15 @@ type Manager struct {
 	mu          sync.Mutex
 	sessions    map[string]*Session
 	subscribers []chan Event
-	dlvPath     string
+	adapters    *adapter.Registry
 }
 
-func NewManager() (*Manager, error) {
-	dlv := findDlv()
-	if dlv == "" {
-		return &Manager{sessions: make(map[string]*Session)}, fmt.Errorf("dlv not found — install with: go install github.com/go-delve/delve/cmd/dlv@latest")
+func NewManager(adapters *adapter.Registry) *Manager {
+	return &Manager{
+		sessions: make(map[string]*Session),
+		adapters: adapters,
 	}
-	return &Manager{sessions: make(map[string]*Session), dlvPath: dlv}, nil
 }
-
-// findDlv searches PATH and common install locations for the dlv binary.
-func findDlv() string {
-	// Try PATH first
-	if p, err := exec.LookPath("dlv"); err == nil {
-		return p
-	}
-
-	// Common locations when launched as a .app (minimal PATH)
-	home, _ := os.UserHomeDir()
-	candidates := []string{
-		"/usr/local/bin/dlv",
-		"/opt/homebrew/bin/dlv",
-		"/usr/local/go/bin/dlv",
-	}
-	if home != "" {
-		candidates = append(candidates,
-			home+"/go/bin/dlv",
-			home+"/.local/bin/dlv",
-			home+"/bin/dlv",
-		)
-		// Check GOPATH/bin if GOPATH is set
-		if gp := os.Getenv("GOPATH"); gp != "" {
-			candidates = append(candidates, gp+"/bin/dlv")
-		}
-	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
-}
-
-func (m *Manager) DlvPath() string { return m.dlvPath }
-
-func (m *Manager) SetDlvPath(path string) { m.dlvPath = path }
 
 // Subscribe returns a channel that receives every session event. Caller must drain.
 func (m *Manager) Subscribe() <-chan Event {
@@ -114,6 +75,16 @@ func (m *Manager) FindByCfg(cfgID string) *Session {
 }
 
 func (m *Manager) Start(ctx context.Context, cfg config.LaunchConfig) (*Session, error) {
+	spec, err := m.adapters.Resolve(cfg.Language)
+	if err != nil {
+		// Adapter not installed — try auto-install, matching Zed's
+		// pattern where debug adapters are downloaded on first use.
+		spec, err = m.tryAutoInstall(ctx, cfg.Language)
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Session{
 		ID:    uuid.NewString(),
 		CfgID: cfg.ID,
@@ -126,13 +97,41 @@ func (m *Manager) Start(ctx context.Context, cfg config.LaunchConfig) (*Session,
 	m.sessions[s.ID] = s
 	m.mu.Unlock()
 
-	if err := s.start(ctx, m.dlvPath); err != nil {
+	if err := s.start(ctx, spec); err != nil {
 		s.emit(Event{Kind: "error", Message: err.Error()})
 		s.killProcess()
 		s.setState(StateError)
 		return s, err
 	}
 	return s, nil
+}
+
+// tryAutoInstall checks if the adapter is registered (even if not installed),
+// runs its install command, and returns the resolved spec. Returns the
+// original resolve error if the adapter isn't registered or install fails.
+func (m *Manager) tryAutoInstall(ctx context.Context, language string) (adapter.ProcessSpec, error) {
+	spec, ok := m.adapters.Get(language)
+	if !ok {
+		return adapter.ProcessSpec{}, fmt.Errorf("no debug adapter registered for language %q", language)
+	}
+	if spec.InstallCmd == "" {
+		return adapter.ProcessSpec{}, fmt.Errorf("debug adapter for %q is not installed", language)
+	}
+
+	m.publish(Event{Kind: "output", Category: "console",
+		Output: fmt.Sprintf("[delveui] Installing %s…\n", spec.Label)})
+
+	installErr := adapter.Install(ctx, m.adapters, spec, func(line string) {
+		m.publish(Event{Kind: "output", Category: "console", Output: line + "\n"})
+	})
+	if installErr != nil {
+		return adapter.ProcessSpec{}, fmt.Errorf("auto-install %s failed: %w", language, installErr)
+	}
+
+	m.publish(Event{Kind: "output", Category: "console",
+		Output: fmt.Sprintf("[delveui] %s installed.\n", spec.Label)})
+
+	return m.adapters.Resolve(language)
 }
 
 func (m *Manager) Stop(id string) error {

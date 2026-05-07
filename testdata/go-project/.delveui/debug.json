@@ -1,0 +1,12 @@
+[
+  {
+    "adapter": "Delve",
+    "label": "Debug go-project",
+    "type": "go",
+    "request": "launch",
+    "mode": "debug",
+    "program": ".",
+    "cwd": ".",
+    "language": "go"
+  }
+]

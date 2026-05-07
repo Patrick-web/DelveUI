@@ -160,10 +160,10 @@ func checkError(resp dap.Message) error {
 
 // Helpers wrap common requests with simpler APIs.
 
-func (c *Client) Initialize(clientID string) (*dap.InitializeResponse, error) {
+func (c *Client) Initialize(clientID string, adapterID string) (*dap.InitializeResponse, error) {
 	req := &dap.InitializeRequest{
 		Request:   dap.Request{ProtocolMessage: dap.ProtocolMessage{Type: "request"}, Command: "initialize"},
-		Arguments: dap.InitializeRequestArguments{ClientID: clientID, ClientName: "DelveUI", AdapterID: "delve", Locale: "en", LinesStartAt1: true, ColumnsStartAt1: true, PathFormat: "path", SupportsRunInTerminalRequest: false},
+		Arguments: dap.InitializeRequestArguments{ClientID: clientID, ClientName: "DelveUI", AdapterID: adapterID, Locale: "en", LinesStartAt1: true, ColumnsStartAt1: true, PathFormat: "path", SupportsRunInTerminalRequest: false},
 	}
 	resp, err := c.Send(req)
 	if err != nil {
@@ -173,7 +173,7 @@ func (c *Client) Initialize(clientID string) (*dap.InitializeResponse, error) {
 	r, ok := resp.(*dap.InitializeResponse); if !ok { return nil, fmt.Errorf("unexpected response type") }; return r, nil
 }
 
-// Launch sends a raw launch with the given args map (Delve-specific keys like program/cwd/env).
+// Launch sends a raw launch with the given args map (adapter-specific keys like program/cwd/env).
 func (c *Client) Launch(args map[string]any) error {
 	return c.sendRawRequest("launch", args)
 }

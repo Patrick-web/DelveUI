@@ -89,14 +89,7 @@ func LoadFile(path string) ([]LaunchConfig, error) {
 		if cfgs[i].ID == "" {
 			cfgs[i].ID = fmt.Sprintf("cfg-%d", i)
 		}
-		// Mark non-Go configs as disabled
-		adapter := cfgs[i].Adapter
-		if adapter != "" && adapter != "Delve" && adapter != "delve" {
-			cfgs[i].Disabled = true
-			cfgs[i].DisabledNote = fmt.Sprintf("Only Go/Delve is supported (uses %q)", adapter)
-			cfgs[i].Language = adapter
-		}
-		if cfgs[i].Language == "" {
+		if cfgs[i].Language == "" && cfgs[i].Adapter == "" {
 			cfgs[i].Language = "go"
 		}
 	}

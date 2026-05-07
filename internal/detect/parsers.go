@@ -69,13 +69,12 @@ func parseVSCode(path string, projectDir string) ([]config.LaunchConfig, error) 
 			buildFlags = strings.Fields(vc.BuildFlags)
 		}
 
-		isGo := vc.Type == "go" || vc.Type == "dlv" || vc.Type == ""
 		lang := vc.Type
-		if lang == "" {
+		if lang == "" || lang == "dlv" {
 			lang = "go"
 		}
 
-		cfg := config.LaunchConfig{
+		cfgs = append(cfgs, config.LaunchConfig{
 			ID:         fmt.Sprintf("vscode-%d", i),
 			Label:      label,
 			Adapter:    or(vc.Type, "Delve"),
@@ -88,12 +87,7 @@ func parseVSCode(path string, projectDir string) ([]config.LaunchConfig, error) 
 			Args:       vc.Args,
 			BuildFlags: buildFlags,
 			Language:   lang,
-		}
-		if !isGo {
-			cfg.Disabled = true
-			cfg.DisabledNote = fmt.Sprintf("Only Go is supported (this config uses %q)", vc.Type)
-		}
-		cfgs = append(cfgs, cfg)
+		})
 	}
 	return cfgs, nil
 }
@@ -158,9 +152,12 @@ func parseGoLand(dir string, projectDir string) ([]config.LaunchConfig, error) {
 			continue
 		}
 		rc := comp.Configuration
-		// Filter for Go configs
-		if !strings.Contains(strings.ToLower(rc.Type), "go") {
-			continue
+
+		isGo := strings.Contains(strings.ToLower(rc.Type), "go")
+		adapter := "Delve"
+		language := ""
+		if isGo {
+			language = "go"
 		}
 
 		program := rc.Package.Value
@@ -190,15 +187,16 @@ func parseGoLand(dir string, projectDir string) ([]config.LaunchConfig, error) {
 		}
 
 		cfgs = append(cfgs, config.LaunchConfig{
-			ID:      fmt.Sprintf("goland-%d", i),
-			Label:   label,
-			Adapter: "Delve",
-			Request: "launch",
-			Mode:    "debug",
-			Program: program,
-			Cwd:     or(rc.WorkingDir.Value, projectDir),
-			Env:     env,
-			Args:    args,
+			ID:       fmt.Sprintf("goland-%d", i),
+			Label:    label,
+			Adapter:  adapter,
+			Language: language,
+			Request:  "launch",
+			Mode:     "debug",
+			Program:  program,
+			Cwd:      or(rc.WorkingDir.Value, projectDir),
+			Env:      env,
+			Args:     args,
 		})
 	}
 	return cfgs, nil

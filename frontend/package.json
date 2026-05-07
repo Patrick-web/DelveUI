@@ -25,7 +25,7 @@
     "@wailsio/runtime": "latest",
     "ansi_up": "^6.0.6",
     "codemirror": "^6.0.2",
-    "svelte-splitpanes": "^0.8.2"
+    "svelte-splitpanes": "0.8.2"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.1",

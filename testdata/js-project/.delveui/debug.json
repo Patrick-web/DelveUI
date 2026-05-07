@@ -1,0 +1,11 @@
+[
+  {
+    "adapter": "JavaScript",
+    "label": "Debug main.js",
+    "type": "pwa-node",
+    "request": "launch",
+    "program": "main.js",
+    "cwd": ".",
+    "language": "node"
+  }
+]

@@ -91,6 +91,31 @@
 
   // Subscribe to backend download progress once; update reactive state.
   let progressUnsub: (() => void) | null = null;
+  let adapterOutputUnsub: Map<string, (() => void)> = new Map();
+
+  // ---- adapters ----
+  interface AdapterInfo {
+    language: string; label: string; description: string;
+    installed: boolean; installCmd: string; installUrl?: string;
+    installing: boolean; error?: string;
+  }
+  let adapters: AdapterInfo[] = [];
+  let adapterOutput: Record<string, string> = {};
+
+  async function loadAdapters() {
+    try {
+      const { List } = await import("../../bindings/github.com/jp/DelveUI/internal/adapter/service");
+      adapters = (await List()) as AdapterInfo[];
+    } catch {}
+  }
+
+  async function installAdapter(language: string) {
+    try {
+      const { Install } = await import("../../bindings/github.com/jp/DelveUI/internal/adapter/service");
+      await Install(language);
+    } catch {}
+  }
+
   onMount(async () => {
     const { Events } = await import("@wailsio/runtime");
     progressUnsub = Events.On("update:progress", (ev: any) => {
@@ -100,10 +125,32 @@
       if (typeof d.total === "number" && d.total > 0) dlTotal = d.total;
       if (d.done) updateState = "ready";
     });
+    adapterOutputUnsub.set("start", Events.On("adapter:install:start", (ev: any) => {
+      const lang = ev?.data?.language ?? ev?.language ?? "";
+      if (lang) adapterOutput[lang] = "";
+      adapters = adapters.map(a => a.language === lang ? { ...a, installing: true, error: "" } : a);
+    }));
+    adapterOutputUnsub.set("output", Events.On("adapter:install:output", (ev: any) => {
+      const lang = ev?.data?.language ?? ev?.language ?? "";
+      const line = ev?.data?.line ?? ev?.line ?? "";
+      if (lang) adapterOutput[lang] = (adapterOutput[lang] ?? "") + line + "\n";
+      adapterOutput = adapterOutput; // trigger reactivity
+    }));
+    adapterOutputUnsub.set("done", Events.On("adapter:install:done", (ev: any) => {
+      const lang = ev?.data?.language ?? ev?.language ?? "";
+      if (lang) loadAdapters();
+    }));
+    adapterOutputUnsub.set("error", Events.On("adapter:install:error", (ev: any) => {
+      const lang = ev?.data?.language ?? ev?.language ?? "";
+      const err = ev?.data?.error ?? ev?.error ?? "";
+      adapters = adapters.map(a => a.language === lang ? { ...a, installing: false, error: err as string } : a);
+    }));
+    loadAdapters();
   });
 
   onDestroy(() => {
     if (progressUnsub) progressUnsub();
+    for (const unsub of adapterOutputUnsub.values()) unsub();
   });
 
   function fmtBytes(n: number): string {
@@ -119,13 +166,14 @@
 
   export let open = false;
 
-  type Tab = "appearance" | "terminal" | "debugfiles" | "vim" | "general";
-  const allTabs: Tab[] = ["appearance", "terminal", "debugfiles", "vim", "general"];
+  type Tab = "appearance" | "terminal" | "debugfiles" | "vim" | "adapters" | "general";
+  const allTabs: Tab[] = ["appearance", "terminal", "debugfiles", "vim", "adapters", "general"];
   const tabIcons: Record<Tab, string> = {
     appearance: "solar:palette-bold",
     terminal: "solar:monitor-bold",
     debugfiles: "solar:document-bold",
     vim: "solar:keyboard-bold",
+    adapters: "solar:bug-minimalistic-bold",
     general: "solar:settings-bold",
   };
 
@@ -136,6 +184,7 @@
     terminal: "Terminal",
     debugfiles: "Debug Files",
     vim: "Vim",
+    adapters: "Adapters",
     general: "General",
   };
 
@@ -160,6 +209,7 @@
     { id: "vim-toggle", label: "Vim Mode", description: "Vim keybindings in the source editor", keywords: "vi keybindings editor modal", tab: "vim" },
     { id: "vim-mappings", label: "Vim Custom Mappings", description: "Define your own vim key mappings", keywords: "vim map remap keybinding lhs rhs normal visual insert", tab: "vim" },
     { id: "vim-cheatsheet", label: "Vim Cheat Sheet", description: "Reference of common vim bindings", keywords: "vim cheat reference motion editing visual search", tab: "vim" },
+    { id: "adapters-list", label: "Debug Adapters", description: "Install debug adapters for different languages", keywords: "adapter debugger language install python node go delve debugpy", tab: "adapters" },
     { id: "general-shortcuts", label: "Keyboard Shortcuts", keywords: "keybindings hotkeys keys palette command", tab: "general" },
     { id: "general-updates", label: "Updates", description: "Check for and install new versions", keywords: "update version upgrade release download", tab: "general" },
     { id: "general-about", label: "About", keywords: "version info build", tab: "general" },
@@ -837,6 +887,63 @@
           {/if}
         </div>
 
+      {:else if tab === "adapters"}
+        <h2>Adapters</h2>
+        <p class="desc">Debug adapters power language-specific debugging. Install the ones you need directly from here.</p>
+
+        {#each adapters as a (a.language)}
+          <div class="card adapter-card" id="adapters-list">
+            <div class="card-row">
+              <div class="card-info">
+                <div class="card-title">
+                  {#if a.installed}
+                    <span class="status-dot ok" title="Installed"></span>
+                  {:else if a.installing}
+                    <span class="status-dot installing" title="Installing…"></span>
+                  {:else}
+                    <span class="status-dot missing" title="Not installed"></span>
+                  {/if}
+                  {a.label}
+                </div>
+                <span class="card-desc">{a.description}</span>
+                {#if a.error}
+                  <span class="card-desc" style="color:var(--danger)">{a.error}</span>
+                {/if}
+              </div>
+              <div class="adapter-actions">
+                {#if a.installing}
+                  <span class="btn sm outlined" style="opacity:0.6">Installing…</span>
+                {:else if a.installed}
+                  <span class="status-badge ready">Ready</span>
+                {:else}
+                  <button class="btn outlined sm" on:click={() => installAdapter(a.language)}>
+                    <Icon icon="solar:download-linear" size={11} /> Install
+                  </button>
+                {/if}
+              </div>
+            </div>
+            {#if !a.installed && !a.installing}
+              <div class="card-row">
+                <code class="install-cmd">{a.installCmd}</code>
+                {#if a.installUrl}
+                  <a href={a.installUrl} target="_blank" rel="noopener" class="btn icon sm" title="Documentation">
+                    <Icon icon="solar:link-square-linear" size={12} />
+                  </a>
+                {/if}
+              </div>
+            {/if}
+            {#if (adapterOutput[a.language]?.length ?? 0) > 0}
+              <div class="card-row install-output-row">
+                <pre class="install-output">{adapterOutput[a.language]}</pre>
+              </div>
+            {/if}
+          </div>
+        {/each}
+
+        {#if adapters.length === 0}
+          <div class="empty">Loading adapters…</div>
+        {/if}
+
       {:else if tab === "general"}
         <h2>General</h2>
         <div class="card" id="general-toggles">
@@ -1344,4 +1451,38 @@
     white-space:nowrap;
   }
   .vim-cheat-desc { color:var(--text-muted); }
+
+  /* Adapters */
+  .adapter-card .card-row { align-items: flex-start; }
+  .adapter-actions { display:flex; align-items:center; gap:var(--space-2); flex-shrink:0; }
+  .status-dot {
+    display:inline-block; width:7px; height:7px; border-radius:50%;
+    margin-right:4px; vertical-align:middle; flex-shrink:0;
+  }
+  .status-dot.ok { background:var(--success); }
+  .status-dot.missing { background:var(--text-faint); }
+  .status-dot.installing { background:var(--warning); animation:pulse-dot 1s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  .status-badge {
+    font-size:var(--text-xs); font-weight:600; padding:2px 8px;
+    border-radius:var(--radius-sm); background:var(--bg-accent);
+    color:var(--success); white-space:nowrap;
+  }
+  .status-badge.ready { background:var(--bg-accent); color:var(--success); }
+
+  .install-cmd {
+    font-size:var(--text-xs); padding:4px 8px; background:var(--bg);
+    border-radius:var(--radius-sm); color:var(--text-muted);
+    word-break:break-all;
+  }
+  .install-output-row { flex-direction:column; align-items:stretch; }
+  .install-output {
+    font-size:var(--text-xs); background:var(--bg); color:var(--text-muted);
+    border-radius:var(--radius-sm); padding:var(--space-2); margin:0;
+    max-height:200px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;
+    line-height:1.4;
+  }
+
+  .desc { color:var(--text-muted); font-size:var(--text-sm); margin-bottom:var(--space-3); }
 </style>
