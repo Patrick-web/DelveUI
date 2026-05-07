@@ -44,6 +44,13 @@ type ProcessSpec struct {
 	//   "$PORT $HOST"             → 5678 127.0.0.1  (positional, js-debug style)
 	PortFlag string
 
+	// TargetViaCLI indicates that the debug target (program + args) should
+	// be passed as positional CLI arguments after the listen address,
+	// rather than through the DAP Launch request. Required by debugpy.
+	// When set, the session layer appends Program and Args to the adapter's
+	// command line and omits them from the DAP launch arguments.
+	TargetViaCLI bool
+
 	// ExtraPath entries are appended to the subprocess PATH environment
 	// variable so common toolchain binaries (compilers, linters, runtimes)
 	// are reachable even in minimal environments like macOS .app bundles.

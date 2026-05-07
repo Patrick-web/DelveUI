@@ -110,6 +110,10 @@ func (s *Session) start(ctx context.Context, spec adapter.ProcessSpec) error {
 	flag = strings.ReplaceAll(flag, "$HOST", "127.0.0.1")
 	flag = strings.ReplaceAll(flag, "$PORT", strconv.Itoa(port))
 	args = append(args, strings.Fields(flag)...)
+	if spec.TargetViaCLI {
+		args = append(args, s.Cfg.Program)
+		args = append(args, s.Cfg.Args...)
+	}
 	cmd := exec.CommandContext(ctx, spec.Binary, args...)
 	if s.Cfg.Cwd != "" {
 		cmd.Dir = s.Cfg.Cwd
@@ -155,29 +159,40 @@ func (s *Session) start(ctx context.Context, spec adapter.ProcessSpec) error {
 		return fmt.Errorf("initialize: %w", err)
 	}
 
-	isAttach := s.Cfg.Request == "attach"
+	isAttach := s.Cfg.Request == "attach" || spec.TargetViaCLI
+	dapRequest := s.Cfg.Request
+	if spec.TargetViaCLI && dapRequest != "attach" {
+		dapRequest = "attach"
+	}
 	launchArgs := map[string]any{
-		"request":    s.Cfg.Request,
-		"mode":       s.Cfg.Mode,
-		"name":       s.Cfg.Label,
-		"type":       spec.DAPType,
-		"args":       s.Cfg.Args,
-		"buildFlags": strings.Join(s.Cfg.BuildFlags, " "),
+		"request": dapRequest,
+		"name":    s.Cfg.Label,
+		"type":    spec.DAPType,
+	}
+	if !spec.TargetViaCLI {
+		launchArgs["args"] = s.Cfg.Args
+	}
+	// Delve-specific: mode changes how the Go toolchain builds the binary.
+	if spec.Language == "go" {
+		launchArgs["mode"] = s.Cfg.Mode
+		if len(s.Cfg.BuildFlags) > 0 {
+			launchArgs["buildFlags"] = strings.Join(s.Cfg.BuildFlags, " ")
+		}
 	}
 	if isAttach {
-		// Delve attach: cwd is still used to resolve relative source paths,
-		// but `program` is ignored — `processId` drives everything.
-		launchArgs["processId"] = s.Cfg.ProcessID
+		if !spec.TargetViaCLI {
+			launchArgs["processId"] = s.Cfg.ProcessID
+		}
 		if s.Cfg.Cwd != "" {
 			launchArgs["cwd"] = s.Cfg.Cwd
 		}
-		// Default mode for attach is "local" (vs "remote"); preserve any
-		// explicit override the user/discovery layer set.
-		if s.Cfg.Mode == "" {
+		if spec.Language == "go" && s.Cfg.Mode == "" {
 			launchArgs["mode"] = "local"
 		}
 	} else {
-		launchArgs["program"] = s.Cfg.Program
+		if !spec.TargetViaCLI {
+			launchArgs["program"] = s.Cfg.Program
+		}
 		launchArgs["cwd"] = s.Cfg.Cwd
 	}
 

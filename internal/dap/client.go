@@ -119,6 +119,12 @@ func (c *Client) readLoop() {
 	for {
 		msg, err := dap.ReadProtocolMessage(c.reader)
 		if err != nil {
+			// Unknown event types (e.g. debugpy's "debugpySockets")
+			// cause a DecodeProtocolMessageFieldError. The underlying
+			// reader is still valid — skip and continue.
+			if _, ok := err.(*dap.DecodeProtocolMessageFieldError); ok {
+				continue
+			}
 			return
 		}
 		switch m := msg.(type) {

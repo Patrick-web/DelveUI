@@ -58,17 +58,18 @@ func main() {
 		InstallURL:  "https://github.com/go-delve/delve",
 	})
 	adapterReg.Register(adapter.ProcessSpec{
-		Language:    "python",
-		Label:       "Python (debugpy)",
-		Description: "Debug Python programs using debugpy",
-		AdapterID:   "debugpy",
-		DAPType:     "python",
-		Binary:      adapter.FindBinary("debugpy", pythonScriptPaths()),
-		BinaryName:  "debugpy",
-		BinaryArgs:  nil,
-		ExtraPath:   pythonScriptPaths(),
-		InstallCmd:  "pip3 install --user debugpy 2>/dev/null || pip3 install --break-system-packages debugpy 2>/dev/null || pip install --user debugpy",
-		InstallURL:  "https://github.com/microsoft/debugpy",
+		Language:      "python",
+		Label:         "Python (debugpy)",
+		Description:   "Debug Python programs using debugpy",
+		AdapterID:     "debugpy",
+		DAPType:       "python",
+		Binary:        adapter.FindBinary("debugpy", pythonScriptPaths()),
+		BinaryName:    "debugpy",
+		BinaryArgs:    []string{"--wait-for-client"},
+		TargetViaCLI:  true,
+		ExtraPath:     pythonScriptPaths(),
+		InstallCmd:    "pip3 install --user debugpy 2>/dev/null || pip3 install --break-system-packages debugpy 2>/dev/null || pip install --user debugpy",
+		InstallURL:    "https://github.com/microsoft/debugpy",
 	})
 	// Node.js: Zed downloads vscode-js-debug from GitHub Releases and runs it
 	// via node. We replicate that here: the adapter binary is node, with the
