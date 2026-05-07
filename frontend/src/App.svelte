@@ -8,7 +8,7 @@
     activeSession,
     refreshWorkspace,
     refreshSessions,
-    pickDebugFile,
+    pickWorkspaceFolder,
     stopSession,
     restartSession,
     control,
@@ -47,7 +47,7 @@
     const { Events } = await import("@wailsio/runtime");
     Events.On("menu:command-palette", () => (paletteOpen = true));
     Events.On("menu:quick-open", () => (quickOpenOpen = true));
-    Events.On("menu:open-debug-file", () => pickDebugFile());
+    Events.On("menu:open-folder", () => pickWorkspaceFolder());
     Events.On("menu:debug-control", (e: any) => {
       const action = (e?.data ?? e) as string;
       const id = $activeSessionId;
@@ -270,18 +270,17 @@
      only the inner button opts out so the rest of the empty bar still drags. */
   .tb-center {
     flex: 1;
-    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     min-width: 0;
-    padding: 0 12px;
+    padding: 10px 12px;
   }
   .tb-cmd {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 10px 4px 10px;
+    padding: 8px 10px 8px 10px;
     background: var(--bg);
     border: 1px solid var(--border-subtle);
     border-radius: 20px;

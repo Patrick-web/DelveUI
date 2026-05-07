@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { workspace, activeSession } from "./store";
+  import { workspace, activeSession, manualSourcePath } from "./store";
   import PanelHeader from "./PanelHeader.svelte";
   import Icon from "./Icon.svelte";
   import FileTreeNode from "./FileTreeNode.svelte";
@@ -10,6 +10,8 @@
 
   let singleRoot: Entry[] = [];
   let singleRootPath = "";
+
+  $: focusPath = $manualSourcePath;
 
   // Build list of all unique project directories from configs.
   $: projectDirs = (() => {
@@ -78,12 +80,12 @@
     <div class="empty">Open a project to browse files.</div>
   {:else if projectDirs.length > 1}
     {#each projectDirs as d (d.path)}
-      <FileTreeNode name={d.label} path={d.path} isDir={true} depth={0} />
+      <FileTreeNode name={d.label} path={d.path} isDir={true} depth={0} focusPath={focusPath} />
     {/each}
   {:else}
     <div class="root-label">{shortPath(singleRootPath)}</div>
     {#each singleRoot as e (e.path)}
-      <FileTreeNode name={e.name} path={e.path} isDir={e.isDir} depth={0} />
+      <FileTreeNode name={e.name} path={e.path} isDir={e.isDir} depth={0} focusPath={focusPath} />
     {/each}
   {/if}
 </div>

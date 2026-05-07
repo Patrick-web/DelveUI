@@ -70,16 +70,15 @@ export async function loadSettings() {
     const s = (await SettingsService.Get()) as any as AppSettings;
     if (!Array.isArray(s.vimMappings)) s.vimMappings = [];
     appSettings.set(s);
-    applyFontSettingsGlobal(s);
+    applyFontSettings(s);
   } catch (e) {
     console.error("Failed to load settings:", e);
   }
 }
 
-function applyFontSettingsGlobal(s: AppSettings) {
+export function applyFontSettings(s: AppSettings) {
   const root = document.documentElement;
   if (s.uiFontSize) root.style.setProperty("--text-md", s.uiFontSize + "px");
-  if (s.bufferFontSize) root.style.setProperty("--text-sm", s.bufferFontSize + "px");
   if (s.termFontSize) root.style.setProperty("--text-term", s.termFontSize + "px");
   if (s.lineHeight) {
     const lh = s.lineHeight === "compact" ? "1.2" : s.lineHeight === "comfortable" ? "1.618" : "1.3";
@@ -89,6 +88,7 @@ function applyFontSettingsGlobal(s: AppSettings) {
 
 export async function saveSettings(s: AppSettings) {
   appSettings.set(s);
+  applyFontSettings(s);
   try {
     await SettingsService.Update(s as any);
   } catch (e) {

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	gitignore "github.com/sabhiram/go-gitignore"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/jp/DelveUI/internal/config"
@@ -91,6 +92,10 @@ func (s *WorkspaceService) OpenWorkspace(path string) (WorkspaceInfo, error) {
 			}
 		}
 		_ = s.dbgStore.MarkActive(folderPath)
+	}
+	// Notify all windows (incl. tray popup) that workspace changed.
+	if s.app != nil {
+		s.app.Event.Emit("workspace:changed", s.Info())
 	}
 	return s.Info(), nil
 }
@@ -567,17 +572,54 @@ type DirEntry struct {
 	IsDir bool   `json:"isDir"`
 }
 
-var allowedExts = map[string]bool{
-	".go": true, ".json": true, ".yaml": true, ".yml": true, ".toml": true,
-	".mod": true, ".sum": true, ".md": true, ".txt": true, ".env": true,
-	".sh": true, ".bash": true, ".zsh": true, ".cfg": true, ".conf": true,
-	".proto": true, ".sql": true, ".graphql": true, ".html": true, ".css": true,
-}
-
 var hiddenDirs = map[string]bool{
 	".git": true, "node_modules": true, "vendor": true, "__pycache__": true,
 	".cache": true, ".idea": true, ".vscode": true, ".zed": true, ".delveui": true,
 	"dist": true, "build": true,
+}
+
+func findGitRoot(start string) string {
+	for d := start; d != "/" && d != "."; d = filepath.Dir(d) {
+		if st, err := os.Stat(filepath.Join(d, ".git")); err == nil && st.IsDir() {
+			return d
+		}
+	}
+	return ""
+}
+
+func loadGitignoreAtRoot(root string) *gitignore.GitIgnore {
+	p := filepath.Join(root, ".gitignore")
+	if _, err := os.Stat(p); err != nil {
+		return nil
+	}
+	ig, err := gitignore.CompileIgnoreFile(p)
+	if err != nil {
+		return nil
+	}
+	return ig
+}
+
+func loadGitignoreForPath(dirPath string) *gitignore.GitIgnore {
+	root := findGitRoot(dirPath)
+	if root == "" {
+		return nil
+	}
+	return loadGitignoreAtRoot(root)
+}
+
+func gitignored(ig *gitignore.GitIgnore, absPath string) bool {
+	if ig == nil {
+		return false
+	}
+	gitRoot := findGitRoot(absPath)
+	if gitRoot == "" {
+		return false
+	}
+	rel, err := filepath.Rel(gitRoot, absPath)
+	if err != nil || rel == "." {
+		return false
+	}
+	return ig.MatchesPath(filepath.ToSlash(rel))
 }
 
 func (f *FileService) ListDir(dirPath string) ([]DirEntry, error) {
@@ -585,22 +627,27 @@ func (f *FileService) ListDir(dirPath string) ([]DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
+	ig := loadGitignoreForPath(dirPath)
 	var dirs, files []DirEntry
 	for _, e := range entries {
 		name := e.Name()
 		if strings.HasPrefix(name, ".") && !e.IsDir() {
 			continue
 		}
+		full := filepath.Join(dirPath, name)
 		if e.IsDir() {
 			if hiddenDirs[name] {
 				continue
 			}
-			dirs = append(dirs, DirEntry{Name: name, Path: filepath.Join(dirPath, name), IsDir: true})
-		} else {
-			ext := filepath.Ext(name)
-			if allowedExts[ext] || ext == "" {
-				files = append(files, DirEntry{Name: name, Path: filepath.Join(dirPath, name), IsDir: false})
+			if gitignored(ig, full) {
+				continue
 			}
+			dirs = append(dirs, DirEntry{Name: name, Path: full, IsDir: true})
+		} else {
+			if gitignored(ig, full) {
+				continue
+			}
+			files = append(files, DirEntry{Name: name, Path: full, IsDir: false})
 		}
 	}
 	return append(dirs, files...), nil
@@ -609,6 +656,7 @@ func (f *FileService) ListDir(dirPath string) ([]DirEntry, error) {
 func (f *FileService) ListGoFiles(root string) ([]string, error) {
 	var results []string
 	count := 0
+	ig := loadGitignoreAtRoot(root)
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return filepath.SkipDir
@@ -617,9 +665,15 @@ func (f *FileService) ListGoFiles(root string) ([]string, error) {
 			if hiddenDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
 			}
+			if gitignored(ig, path) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filepath.Ext(d.Name()) == ".go" {
+			if gitignored(ig, path) {
+				return nil
+			}
 			rel, _ := filepath.Rel(root, path)
 			results = append(results, rel)
 			count++
@@ -642,6 +696,7 @@ func (f *FileService) ListGoFiles(root string) ([]string, error) {
 func (f *FileService) ListAllFiles(root string) ([]string, error) {
 	var results []string
 	count := 0
+	ig := loadGitignoreAtRoot(root)
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return filepath.SkipDir
@@ -650,11 +705,15 @@ func (f *FileService) ListAllFiles(root string) ([]string, error) {
 			if hiddenDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
 			}
+			if gitignored(ig, path) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		// Skip dotfiles at the file level too (e.g. .DS_Store) since users
-		// generally don't search for them.
 		if strings.HasPrefix(d.Name(), ".") {
+			return nil
+		}
+		if gitignored(ig, path) {
 			return nil
 		}
 		rel, _ := filepath.Rel(root, path)

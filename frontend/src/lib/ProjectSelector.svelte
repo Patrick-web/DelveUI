@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { debugFiles, loadDebugFiles, type DebugFileEntry } from "./settings-store";
-  import { openDebugFile, pickDebugFile, pickWorkspaceFolder, refreshWorkspace, refreshTargets } from "./store";
+  import { openDebugFile, pickWorkspaceFolder, refreshWorkspace, refreshTargets } from "./store";
   import Icon from "./Icon.svelte";
 
   let loading = true;
@@ -23,12 +23,6 @@
 
   async function openFile(entry: DebugFileEntry) {
     await openDebugFile(entry.path);
-    await refreshWorkspace();
-    refreshTargets().catch(() => {});
-  }
-
-  async function pickNew() {
-    await pickDebugFile();
     await refreshWorkspace();
     refreshTargets().catch(() => {});
   }
@@ -55,7 +49,7 @@
       <div>
         <h1>Choose a project</h1>
         <p class="subtitle">
-          Open a folder or point at a <code>debug.json</code> / <code>launch.json</code>.
+          Open a folder to auto-detect Go targets and debug configurations.
         </p>
       </div>
     </div>
@@ -68,7 +62,7 @@
       <div class="empty">
         <Icon icon="solar:inbox-bold" size={24} color="var(--text-faint)" />
         <span>No projects yet.</span>
-        <span class="sub">Open a folder or pick a <code>debug.json</code> / <code>launch.json</code> to get started.</span>
+        <span class="sub">Open a folder to get started — debug configs are auto-detected.</span>
       </div>
     {:else}
       <ul class="list">
@@ -103,10 +97,6 @@
       <button class="pill primary" on:click={pickFolder}>
         <Icon icon="solar:folder-with-files-bold" size={13} />
         Open folder…
-      </button>
-      <button class="pill" on:click={pickNew}>
-        <Icon icon="solar:document-add-bold" size={13} />
-        Open debug.json…
       </button>
     </div>
   </div>

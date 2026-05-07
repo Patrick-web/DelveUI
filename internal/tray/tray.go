@@ -84,8 +84,8 @@ func (c *Controller) Rebuild() {
 	}
 
 	menu.AddSeparator()
-	menu.Add("Open debug.json…").OnClick(func(*application.Context) {
-		go c.pickFile()
+	menu.Add("Open Folder…").OnClick(func(*application.Context) {
+		go c.pickFolder()
 	})
 	menu.Add("Show Window").OnClick(func(*application.Context) {
 		if c.mainWin != nil {
@@ -103,9 +103,9 @@ func (c *Controller) Rebuild() {
 	c.tray.SetMenu(menu)
 }
 
-func (c *Controller) pickFile() {
-	if _, err := c.ws.PickDebugFile(); err != nil {
-		c.app.Logger.Error("pick debug.json: " + err.Error())
+func (c *Controller) pickFolder() {
+	if _, err := c.ws.PickWorkspaceFolder(); err != nil {
+		c.app.Logger.Error("pick folder: " + err.Error())
 	}
 	application.InvokeAsync(c.Rebuild)
 	c.app.Event.Emit("workspace:changed", c.ws.Info())

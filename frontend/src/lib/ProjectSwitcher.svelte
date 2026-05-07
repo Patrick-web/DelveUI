@@ -6,7 +6,6 @@
     workspace,
     sessions,
     openDebugFile,
-    pickDebugFile,
     pickWorkspaceFolder,
     refreshWorkspace,
     refreshSessions,
@@ -15,10 +14,7 @@
   import { debugFiles, loadDebugFiles, removeDebugFile, type DebugFileEntry } from "./settings-store";
   import Icon from "./Icon.svelte";
 
-  type Tab = "folders" | "debugfiles";
-
   let paletteOpen = false;
-  let tab: Tab = "folders";
   let filter = "";
   let pendingEntry: DebugFileEntry | null = null;
   let switching = false;
@@ -68,22 +64,16 @@
   $: currentEntry = ($debugFiles ?? []).find(isCurrent) ?? null;
   $: currentLabel = labelFor(currentEntry, $workspace?.root ?? "");
 
-  // Folders tab: entries that don't pin a specific debug file (the standard
-  // .zed/.vscode/.delveui folder-walk path). Debug files tab: entries that
-  // were registered by pointing directly at a launch.json/debug.json outside
-  // those well-known locations (entry.launchFile is set).
+  // Single flat list of all registered folder entries.
   $: sortedEntries = ($debugFiles ?? []).slice().sort((a, b) => {
     if (!!a.stale !== !!b.stale) return a.stale ? 1 : -1;
     const at = new Date(a.lastUsed ?? a.addedAt).getTime() || 0;
     const bt = new Date(b.lastUsed ?? b.addedAt).getTime() || 0;
     return bt - at;
   });
-  $: folderEntries = sortedEntries.filter((e) => !e.launchFile);
-  $: debugFileEntries = sortedEntries.filter((e) => !!e.launchFile);
-  $: tabEntries = tab === "folders" ? folderEntries : debugFileEntries;
   $: visibleEntries = filter
-    ? tabEntries.filter((e) => fuzzy(filter, labelFor(e) + " " + e.path))
-    : tabEntries;
+    ? sortedEntries.filter((e) => fuzzy(filter, labelFor(e) + " " + e.path))
+    : sortedEntries;
 
   async function openPalette() {
     paletteOpen = true;
@@ -114,13 +104,6 @@
   async function importFolder() {
     paletteOpen = false;
     await pickWorkspaceFolder();
-    await refreshWorkspace();
-    refreshTargets().catch(() => {});
-  }
-
-  async function importDebugFile() {
-    paletteOpen = false;
-    await pickDebugFile();
     await refreshWorkspace();
     refreshTargets().catch(() => {});
   }
@@ -169,34 +152,13 @@
     on:keydown={(e) => e.key === "Escape" && (paletteOpen = false)}
   ></div>
   <div class="pp-palette" role="dialog" aria-modal="true" on:click|stopPropagation on:keydown|stopPropagation>
-    <div class="pp-tabs" role="tablist">
-      <button
-        class="pp-tab"
-        class:active={tab === "folders"}
-        role="tab"
-        aria-selected={tab === "folders"}
-        on:click={() => { tab = "folders"; filter = ""; }}
-      >
-        Folders <span class="pp-tab-count">{folderEntries.length}</span>
-      </button>
-      <button
-        class="pp-tab"
-        class:active={tab === "debugfiles"}
-        role="tab"
-        aria-selected={tab === "debugfiles"}
-        on:click={() => { tab = "debugfiles"; filter = ""; }}
-      >
-        Debug files <span class="pp-tab-count">{debugFileEntries.length}</span>
-      </button>
-    </div>
-
     <div class="pp-search">
       <Icon icon="solar:magnifer-linear" size={12} color="var(--text-faint)" />
       <!-- svelte-ignore a11y-autofocus -->
       <input
         bind:this={inputEl}
         bind:value={filter}
-        placeholder={tab === "folders" ? "Filter folders…" : "Filter debug files…"}
+        placeholder="Filter folders…"
         spellcheck="false"
         autofocus
       />
@@ -205,22 +167,20 @@
     <div class="pp-list">
       <button
         class="pp-import"
-        on:click={tab === "folders" ? importFolder : importDebugFile}
+        on:click={importFolder}
       >
         <Icon
-          icon={tab === "folders" ? "solar:folder-with-files-bold" : "solar:document-add-bold"}
+          icon="solar:folder-with-files-bold"
           size={14}
           color="var(--accent)"
         />
-        <span>{tab === "folders" ? "Import folder…" : "Import debug.json…"}</span>
+        <span>Import folder…</span>
       </button>
 
       {#if visibleEntries.length === 0}
         <div class="pp-empty">
-          {#if tabEntries.length === 0}
-            {tab === "folders"
-              ? "No folders imported yet."
-              : "No debug files imported yet."}
+          {#if sortedEntries.length === 0}
+            No folders imported yet.
           {:else}
             No matches for &ldquo;{filter}&rdquo;.
           {/if}
@@ -235,7 +195,7 @@
             on:click={() => pick(e)}
           >
             <Icon
-              icon={tab === "folders" ? "solar:folder-open-bold" : "solar:document-text-bold"}
+              icon="solar:folder-open-bold"
               size={14}
               color={e.stale ? "var(--text-faint)" : "var(--accent)"}
             />
@@ -351,45 +311,6 @@
     overflow: hidden;
     --wails-draggable: no-drag;
   }
-  .pp-tabs {
-    display: flex;
-    gap: 2px;
-    padding: 6px;
-    background: var(--bg-subtle);
-    border-bottom: 1px solid var(--border-subtle);
-    flex-shrink: 0;
-  }
-  .pp-tab {
-    flex: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 10px;
-    background: transparent;
-    border: 0;
-    border-radius: 5px;
-    color: var(--text-faint);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .pp-tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
-  .pp-tab.active {
-    color: var(--text);
-    background: var(--bg-elevated);
-    box-shadow: inset 0 0 0 1px var(--border);
-  }
-  .pp-tab-count {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-faint);
-    font-weight: 400;
-  }
-  .pp-tab.active .pp-tab-count { color: var(--text-muted); }
-
   .pp-search {
     display: flex;
     align-items: center;

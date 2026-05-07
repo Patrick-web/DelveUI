@@ -9,7 +9,6 @@
   } from "./settings-store";
   import {
     pickWorkspaceFolder,
-    pickDebugFile,
     refreshWorkspace,
     refreshTargets,
     openDebugFile,
@@ -39,13 +38,6 @@
 
   async function openFolder() {
     await pickWorkspaceFolder();
-    await refreshWorkspace();
-    refreshTargets().catch(() => {});
-    onDone();
-  }
-
-  async function openDebugJson() {
-    await pickDebugFile();
     await refreshWorkspace();
     refreshTargets().catch(() => {});
     onDone();
@@ -101,14 +93,7 @@
           <Icon icon="solar:folder-with-files-bold" size={16} />
           <span class="cta-label">
             <span class="cta-title">Open Folder…</span>
-            <span class="cta-sub">Pick the project you're working on</span>
-          </span>
-        </button>
-        <button class="cta secondary" on:click={openDebugJson}>
-          <Icon icon="solar:document-add-bold" size={16} />
-          <span class="cta-label">
-            <span class="cta-title">Open debug.json…</span>
-            <span class="cta-sub">Point at an existing debug.json or launch.json file</span>
+            <span class="cta-sub">Pick the project you're working on — debug configs are auto-detected</span>
           </span>
         </button>
       </div>

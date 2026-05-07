@@ -214,8 +214,8 @@ func installAppMenu(app *application.App) {
 	menu.AddRole(application.AppMenu)
 
 	file := menu.AddSubmenu("File")
-	file.Add("Open debug.json…").SetAccelerator("CmdOrCtrl+Shift+O").OnClick(func(_ *application.Context) {
-		app.Event.Emit("menu:open-debug-file", nil)
+	file.Add("Open Folder…").SetAccelerator("CmdOrCtrl+Shift+O").OnClick(func(_ *application.Context) {
+		app.Event.Emit("menu:open-folder", nil)
 	})
 	file.Add("Quick Open File…").SetAccelerator("CmdOrCtrl+O").OnClick(func(_ *application.Context) {
 		app.Event.Emit("menu:quick-open", nil)

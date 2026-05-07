@@ -3,16 +3,36 @@
   import { setActivePanel } from "./panels/layout";
   import Icon from "./Icon.svelte";
   import Self from "./FileTreeNode.svelte";
+  import { getFileIcon, getFolderIcon } from "./file-icons";
   import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
 
   export let name: string;
   export let path: string;
   export let isDir: boolean;
   export let depth: number = 0;
+  export let focusPath: string = "";
 
   let expanded = false;
   let children: any[] | null = null;
   let loading = false;
+
+  $: isActive = !isDir && path === focusPath;
+
+  async function loadChildren() {
+    loading = true;
+    try {
+      children = (await FileService.ListDir(path)) as any[] ?? [];
+    } catch { children = []; }
+    loading = false;
+  }
+
+  $: if (focusPath && isDir && focusPath !== path) {
+    const prefix = path.endsWith("/") ? path : path + "/";
+    if (focusPath.startsWith(prefix)) {
+      if (!expanded) expanded = true;
+      if (!children) loadChildren();
+    }
+  }
 
   async function toggle() {
     if (!isDir) {
@@ -22,35 +42,24 @@
     }
     expanded = !expanded;
     if (expanded && !children) {
-      loading = true;
-      try {
-        children = (await FileService.ListDir(path)) as any[] ?? [];
-      } catch { children = []; }
-      loading = false;
+      await loadChildren();
     }
-  }
-
-  function fileIcon(n: string): string {
-    if (n.endsWith(".go")) return "solar:code-bold";
-    if (n.endsWith(".json")) return "solar:document-bold";
-    if (n.endsWith(".mod") || n.endsWith(".sum")) return "solar:box-bold";
-    return "solar:file-bold";
   }
 </script>
 
-<button class="node" style:padding-left="{depth * 14 + 8}px" on:click={toggle}>
+<button class="node" class:active={isActive} style:padding-left="{depth * 14 + 8}px" on:click={toggle}>
   {#if isDir}
-    <Icon icon={expanded ? "solar:folder-open-bold" : "solar:folder-bold"} size={13} color="var(--text-muted)" />
+    <Icon icon={getFolderIcon(name, expanded)} size={13} />
   {:else}
-    <Icon icon={fileIcon(name)} size={13} color={name.endsWith(".go") ? "var(--info)" : "var(--text-faint)"} />
+    <Icon icon={getFileIcon(name)} size={13} />
   {/if}
-  <span class="name" class:go={name.endsWith(".go")}>{name}</span>
+  <span class="name">{name}</span>
   {#if loading}<span class="ld">…</span>{/if}
 </button>
 
 {#if expanded && children}
   {#each children as c (c.path)}
-    <Self name={c.name} path={c.path} isDir={c.isDir} depth={depth + 1} />
+    <Self name={c.name} path={c.path} isDir={c.isDir} depth={depth + 1} focusPath={focusPath} />
   {/each}
 {/if}
 
@@ -62,7 +71,7 @@
     text-align:left;
   }
   .node:hover { background:var(--bg-subtle); }
+  .node.active { background:rgba(59,130,246,0.15); }
   .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .name.go { color:var(--info); }
   .ld { color:var(--text-faint); font-size:var(--text-xs); }
 </style>

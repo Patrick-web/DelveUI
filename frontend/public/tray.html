@@ -104,10 +104,47 @@
     color: var(--text-faint); font-size: 12px;
   }
 
+  /* Tab bar — matches main-window Sidebar segmented control */
+  .tab-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
+    border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .segmented {
+    display: flex;
+    background: var(--bg);
+    border-radius: var(--radius-md);
+    padding: 2px;
+    gap: 1px;
+  }
+  .seg {
+    flex: 0 0 auto;
+    padding: 0 10px;
+    height: 24px;
+    border: 0;
+    background: transparent;
+    color: var(--text-faint);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: calc(var(--radius-md) - 2px);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 100ms, color 100ms;
+  }
+  .seg:hover { color: var(--text); }
+  .seg.active {
+    background: var(--bg-elevated);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+
   /* Launch section */
   .launch {
-    border-top: 1px solid var(--border-subtle);
-    padding: 6px;
+    padding: 4px 6px 6px;
     flex-shrink: 0;
     max-height: 50%;
     overflow: auto;
@@ -137,6 +174,9 @@
     text-transform: uppercase; letter-spacing: 0.5px;
     flex-shrink: 0;
   }
+
+  /* Tab panes */
+  .pane[hidden] { display: none; }
 
   /* Spinner used for instant click feedback in launch buttons + sessions starting state */
   .spin {
@@ -170,11 +210,20 @@
   </div>
 
   <div class="sessions" id="sessions"></div>
+
+  <div class="tab-bar" id="tab-bar" style="display:none">
+    <div class="segmented" role="tablist">
+      <button class="seg active" role="tab" aria-selected="true" data-tab="debug">Debug</button>
+      <button class="seg" role="tab" aria-selected="false" data-tab="run">Run</button>
+    </div>
+  </div>
   <div class="launch" id="launch" style="display:none">
-    <h2 id="debug-h" style="display:none">Debug</h2>
-    <div id="configs"></div>
-    <h2 id="run-h" style="display:none">Run</h2>
-    <div id="targets"></div>
+    <div class="pane" id="pane-debug">
+      <div id="configs"></div>
+    </div>
+    <div class="pane" id="pane-run" style="display:none">
+      <div id="targets"></div>
+    </div>
   </div>
 
   <div class="footer">
@@ -197,9 +246,10 @@
     const sessionsEl = document.getElementById("sessions");
     const configsEl = document.getElementById("configs");
     const targetsEl = document.getElementById("targets");
+    const tabBar = document.getElementById("tab-bar");
     const launchSection = document.getElementById("launch");
-    const debugH = document.getElementById("debug-h");
-    const runH = document.getElementById("run-h");
+    const paneDebug = document.getElementById("pane-debug");
+    const paneRun = document.getElementById("pane-run");
 
     // Targets-launching feedback: ids the user just clicked, while the
     // backend Start/Launch call is still in flight. Cleared when the call
@@ -211,6 +261,21 @@
     // workspace is open, so first tray-open after app start still surfaces
     // discovery items even if the main window's Run tab hasn't been visited.
     let triedDiscovery = false;
+    let activeTab = "debug";
+
+    // Tab switching
+    tabBar.addEventListener("click", (e) => {
+      const seg = e.target.closest(".seg");
+      if (!seg) return;
+      const tab = seg.dataset.tab;
+      activeTab = tab;
+      for (const s of tabBar.querySelectorAll(".seg")) {
+        s.classList.toggle("active", s.dataset.tab === tab);
+        s.setAttribute("aria-selected", s.dataset.tab === tab ? "true" : "false");
+      }
+      paneDebug.hidden = tab !== "debug";
+      paneRun.hidden = tab !== "run";
+    });
 
     const ICONS = {
       open:  '<svg class="i" viewBox="0 0 24 24"><path d="M7 17L17 7M7 7h10v10"/></svg>',
@@ -239,14 +304,14 @@
 
     async function fetchTargets(hasWorkspace) {
       let res = null;
-      try { res = await callDisc("Targets"); } catch {}
+      try { res = await callDisc("Targets"); } catch (e) { console.error("tray: DiscoveryService.Targets failed", e); }
       let targets = (res && res.targets) || [];
       if (!triedDiscovery && targets.length === 0 && hasWorkspace) {
         triedDiscovery = true;
         try {
           const refreshed = await callDisc("Refresh");
           targets = refreshed || [];
-        } catch {}
+        } catch (e) { console.error("tray: DiscoveryService.Refresh failed", e); }
       }
       return targets;
     }
@@ -268,7 +333,7 @@
 
       // sessions
       let list = [];
-      try { list = await callService("SessionService", "List"); } catch {}
+      try { list = await callService("SessionService", "List"); } catch (e) { console.error("tray: SessionService.List failed", e); }
       // Drop dead sessions — exited or errored. Their PIDs no longer point
       // to a live process, so showing them in the tray is misleading.
       list = (list || [])
@@ -302,7 +367,7 @@
 
       // workspace info (used by both configs and run targets)
       let info = {};
-      try { info = await callWS("Info"); } catch {}
+      try { info = await callWS("Info"); } catch (e) { console.error("tray: WorkspaceService.Info failed", e); }
       const hasWorkspace = !!info.root;
       const runningCfgIds = new Set((list || []).map(s => s.cfgId));
 
@@ -320,7 +385,6 @@
           onClick: () => startCfg(cfg.id),
         }));
       }
-      debugH.style.display = availableCfgs.length > 0 ? "" : "none";
 
       // run targets discovered inside the opened workspace folder
       const targets = await fetchTargets(hasWorkspace);
@@ -336,10 +400,12 @@
           onClick: () => launchTarget(t.id),
         }));
       }
-      runH.style.display = availableTargets.length > 0 ? "" : "none";
 
-      launchSection.style.display =
-        availableCfgs.length > 0 || availableTargets.length > 0 ? "" : "none";
+      paneDebug.hidden = activeTab !== "debug";
+      paneRun.hidden = activeTab !== "run";
+      const hasAny = availableCfgs.length > 0 || availableTargets.length > 0;
+      launchSection.style.display = hasAny ? "" : "none";
+      tabBar.style.display = hasAny ? "" : "none";
     }
 
     async function startCfg(id) {
@@ -398,6 +464,7 @@
 
     Events.On("tray:sessions-changed", refresh);
     Events.On("session:event", refresh);
+    Events.On("workspace:changed", refresh);
     Events.On("discovery:targets", refresh);
     Events.On("discovery:done", refresh);
 

@@ -8,7 +8,6 @@
   } from "./settings-store";
   import {
     workspace,
-    pickDebugFile,
     refreshWorkspace,
     openDebugFile,
   } from "./store";
@@ -41,11 +40,6 @@
     close();
   }
 
-  async function addNew() {
-    await pickDebugFile();
-    await loadDebugFiles();
-  }
-
   function onKey(e: KeyboardEvent) {
     if (e.key === "Escape") { close(); return; }
     if (e.key === "ArrowDown") { e.preventDefault(); selected = Math.min(items.length - 1, selected + 1); }
@@ -73,8 +67,8 @@
     <div class="list">
       {#if items.length === 0}
         <div class="empty">
-          <span>No debug files imported yet.</span>
-          <span class="sub">Add a debug.json or auto-detect from your editors.</span>
+          <span>No folders imported yet.</span>
+          <span class="sub">Open a folder to auto-detect debug configurations.</span>
         </div>
       {/if}
       {#each items as f, i}
@@ -103,12 +97,6 @@
           <span class="item-count">{f.configs?.length ?? 0} configs</span>
         </button>
       {/each}
-    </div>
-
-    <div class="footer">
-      <button class="btn outlined" on:click={addNew}>
-        <Icon icon="solar:add-circle-bold" size={12} /> Add debug.json
-      </button>
     </div>
   </div>
 {/if}
@@ -149,9 +137,4 @@
   .item-label { font-size:var(--text-sm); font-weight:500; color:var(--text); }
   .item-path { font-size:var(--text-xs); color:var(--text-faint); font-family:var(--font-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .item-count { font-size:var(--text-xs); color:var(--text-faint); white-space:nowrap; }
-
-  .footer {
-    display:flex; gap:var(--space-2); padding:var(--space-2) var(--space-3);
-    border-top:1px solid var(--border);
-  }
 </style>

@@ -25,7 +25,7 @@
     previewThemeByName,
     revertThemePreview,
   } from "./theme-engine";
-  import { pickDebugFile, pickWorkspaceFolder, refreshWorkspace, openDebugFile, workspace } from "./store";
+  import { pickWorkspaceFolder, refreshWorkspace, openDebugFile, workspace } from "./store";
   import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
   import { showInfo, showError } from "./toast";
   import * as UpdateService from "../../bindings/github.com/jp/DelveUI/internal/updater/service";
@@ -155,7 +155,7 @@
     { id: "appearance-line-height", label: "Line Height", keywords: "spacing density compact comfortable standard", tab: "appearance" },
     { id: "terminal-font", label: "Terminal Font Size", keywords: "font size text", tab: "terminal" },
     { id: "terminal-theme", label: "Terminal Theme", keywords: "color follow editor", tab: "terminal" },
-    { id: "debugfiles-projects", label: "Projects", description: "Registered folders and debug files", keywords: "folder workspace project import open debug launch json file", tab: "debugfiles" },
+    { id: "debugfiles-projects", label: "Projects", description: "Registered folders", keywords: "folder workspace project import open debug launch json file", tab: "debugfiles" },
     { id: "general-toggles", label: "Restore last project on launch", description: "Reopen the most recent project at startup", keywords: "startup autoload reopen launch session", tab: "general" },
     { id: "vim-toggle", label: "Vim Mode", description: "Vim keybindings in the source editor", keywords: "vi keybindings editor modal", tab: "vim" },
     { id: "vim-mappings", label: "Vim Custom Mappings", description: "Define your own vim key mappings", keywords: "vim map remap keybinding lhs rhs normal visual insert", tab: "vim" },
@@ -313,7 +313,6 @@
   function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     settings = { ...settings, [key]: value };
     save();
-    applyFontSettings(settings);
   }
 
   // --- Vim mappings ---
@@ -470,23 +469,7 @@
     return (settings.vimMappings ?? []).some((m) => m.lhs === s.lhs && m.mode === s.mode);
   }
 
-  function applyFontSettings(s: AppSettings) {
-    const root = document.documentElement;
-    if (s.uiFontSize) root.style.setProperty("--text-md", s.uiFontSize + "px");
-    if (s.bufferFontSize) root.style.setProperty("--text-sm", s.bufferFontSize + "px");
-    if (s.termFontSize) root.style.setProperty("--text-term", s.termFontSize + "px");
-    if (s.lineHeight) {
-      const lh = s.lineHeight === "compact" ? "1.2" : s.lineHeight === "comfortable" ? "1.618" : "1.3";
-      root.style.setProperty("--lh-standard", lh);
-    }
-  }
-
   // --- Debug files ---
-  async function addFile() {
-    await pickDebugFile();
-    const ws = (await import("./store")).workspace;
-    const unsub = ws.subscribe(async (w) => { if (w?.debugFile) { await addDebugFile(w.debugFile); unsub(); } });
-  }
   async function addFolder() {
     await pickWorkspaceFolder();
     await refreshWorkspace();
@@ -695,9 +678,6 @@
         <div class="row" style="margin-bottom: var(--space-3)">
           <button class="btn primary" on:click={addFolder}>
             <Icon icon="solar:folder-with-files-bold" size={13} /> Open folder…
-          </button>
-          <button class="btn outlined" on:click={addFile}>
-            <Icon icon="solar:document-add-bold" size={13} /> Open debug.json…
           </button>
           {#if ($debugFiles ?? []).some((f) => f.stale)}
             <button class="btn outlined" on:click={async () => { const n = await removeStaleDebugFiles(); showInfo(`Removed ${n} missing project${n === 1 ? "" : "s"}`, ""); }}>

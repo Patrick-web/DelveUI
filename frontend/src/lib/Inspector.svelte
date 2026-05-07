@@ -97,7 +97,6 @@
     border-bottom: 1px solid var(--border-subtle);
   }
   :global(body.mac) .head { border-bottom-color: rgba(0, 0, 0, 0.3); }
-  .head .segmented .seg { padding: 0 8px; }
 
   .body {
     flex: 1;

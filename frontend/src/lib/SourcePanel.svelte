@@ -209,6 +209,17 @@
     view.dispatch({ effects: vimCompartment.reconfigure(vimEnabled ? vim() : []) });
   }
 
+  // --- Font size ---
+  const fontSizeCompartment = new Compartment();
+  $: fontSize = $appSettings.bufferFontSize ?? 13;
+  $: if (view) {
+    view.dispatch({
+      effects: fontSizeCompartment.reconfigure(
+        EditorView.theme({ "&": { fontSize: `${fontSize}px` } }),
+      ),
+    });
+  }
+
   // Replay user-defined vim mappings whenever the settings change. Vim.map is
   // global, so we unmap the prior set first to avoid stale bindings sticking
   // around after the user edits or removes a row in Settings.
@@ -243,6 +254,9 @@
 
     const extensions = [
       vimCompartment.of(vimEnabled ? vim() : []),
+      fontSizeCompartment.of(
+        EditorView.theme({ "&": { fontSize: `${$appSettings.bufferFontSize ?? 13}px` } }),
+      ),
       drawSelection(),
       EditorState.allowMultipleSelections.of(true),
       history(),
@@ -280,7 +294,7 @@
       breakpointState,
       currentLineField,
       EditorView.theme({
-        "&": { height: "100%", fontSize: `${$appSettings.bufferFontSize ?? 13}px` },
+        "&": { height: "100%" },
         ".cm-content": { fontFamily: "var(--font-mono)", padding: "0" },
         ".cm-gutters": {
           backgroundColor: "var(--bg-subtle)",
@@ -298,12 +312,12 @@
         },
         ".cm-bp-mark": {
           color: "var(--danger)",
-          fontSize: "14px",
+          fontSize: "1.08em",
           lineHeight: "1",
         },
         ".cm-bp-ghost": {
           color: "var(--danger)",
-          fontSize: "14px",
+          fontSize: "1.08em",
           lineHeight: "1",
           opacity: "0",
           transition: "opacity 80ms ease-out",
@@ -326,7 +340,7 @@
           background: "var(--bg-elevated)",
           borderBottom: "1px solid var(--border)",
           padding: "4px 8px",
-          fontSize: "12px",
+          fontSize: "0.92em",
           fontFamily: "var(--font-mono)",
         },
         ".cm-search input, .cm-search button": {
@@ -335,11 +349,11 @@
           color: "var(--text)",
           borderRadius: "3px",
           padding: "2px 6px",
-          fontSize: "12px",
+          fontSize: "0.92em",
           fontFamily: "var(--font-mono)",
         },
         ".cm-search button:hover": { background: "var(--bg)" },
-        ".cm-search label": { color: "var(--text-muted)", fontSize: "11px" },
+        ".cm-search label": { color: "var(--text-muted)", fontSize: "0.85em" },
         ".cm-searchMatch": { backgroundColor: "rgba(255,204,0,0.25)", borderRadius: "2px" },
         ".cm-searchMatch-selected": { backgroundColor: "rgba(255,204,0,0.5)" },
       }),

@@ -6,6 +6,7 @@ import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/serv
 import * as DiscoveryService from "../../bindings/github.com/jp/DelveUI/internal/discovery/service";
 import { wrapHandler } from "./diagnostics";
 import { bumpRecency } from "./recency-store";
+import { setSidebarActive } from "./panels/layout";
 
 export type LaunchConfig = {
   id: string;
@@ -130,22 +131,7 @@ export async function refreshSessions() {
 export async function openWorkspace(path: string) {
   const info = (await WorkspaceService.OpenWorkspace(path)) as any;
   workspace.set(info as WorkspaceInfo);
-}
-
-export async function pickDebugFile() {
-  try {
-    const info = (await WorkspaceService.PickDebugFile()) as any;
-    workspace.set(info as WorkspaceInfo);
-    // Auto-persist to debug files database
-    if (info?.debugFile) {
-      const { addDebugFile } = await import("./settings-store");
-      await addDebugFile(info.debugFile).catch(() => {});
-    }
-  } catch (e: any) {
-    const msg = String(e?.message ?? e);
-    const { showError } = await import("./toast");
-    showError("Could not load debug.json", msg);
-  }
+  setSidebarActive("run");
 }
 
 export async function pickWorkspaceFolder() {
@@ -158,6 +144,7 @@ export async function pickWorkspaceFolder() {
       const { loadDebugFiles } = await import("./settings-store");
       await loadDebugFiles().catch(() => {});
     }
+    setSidebarActive("run");
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     const { showError } = await import("./toast");
@@ -169,6 +156,7 @@ export async function openDebugFile(path: string) {
   try {
     const info = (await WorkspaceService.OpenDebugFile(path)) as any;
     workspace.set(info as WorkspaceInfo);
+    setSidebarActive("run");
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     const { showError } = await import("./toast");

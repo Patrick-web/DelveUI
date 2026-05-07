@@ -8,7 +8,6 @@
     control,
     stopSession,
     startSession,
-    pickDebugFile,
     cleanDebugBinaries,
     manualSourcePath,
   } from "./store";
@@ -94,11 +93,6 @@
         label: "Debug: Run…",
         hint: "→",
         run: () => enterRunMode(),
-      },
-      {
-        id: "workspace.openJson",
-        label: "Workspace: Open debug.json…",
-        run: () => pickDebugFile(),
       },
       {
         id: "debug.cleanBinaries",
