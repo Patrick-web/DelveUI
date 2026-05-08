@@ -50,7 +50,11 @@ func (m *Manager) List() []*Session {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := make([]*Session, 0, len(m.sessions))
-	for _, s := range m.sessions {
+	for id, s := range m.sessions {
+		if s.state == StateExited || s.state == StateError {
+			delete(m.sessions, id)
+			continue
+		}
 		out = append(out, s)
 	}
 	return out
@@ -135,12 +139,43 @@ func (m *Manager) tryAutoInstall(ctx context.Context, language string) (adapter.
 }
 
 func (m *Manager) Stop(id string) error {
-	s := m.Get(id)
-	if s == nil {
+	m.mu.Lock()
+	s, ok := m.sessions[id]
+	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("session %s not found", id)
 	}
+	delete(m.sessions, id)
+	m.mu.Unlock()
 	s.stop()
 	return nil
+}
+
+// Remove deletes a terminated session from the manager's map, releasing
+// associated memory. Safe to call on already-terminated sessions; no-op
+// for sessions that are still running.
+func (m *Manager) Remove(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.sessions[id]
+	if !ok {
+		return
+	}
+	if s.state != StateExited && s.state != StateError {
+		return
+	}
+	delete(m.sessions, id)
+}
+
+// Prune removes all terminated sessions from the manager.
+func (m *Manager) Prune() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, s := range m.sessions {
+		if s.state == StateExited || s.state == StateError {
+			delete(m.sessions, id)
+		}
+	}
 }
 
 func (m *Manager) StopAll() {

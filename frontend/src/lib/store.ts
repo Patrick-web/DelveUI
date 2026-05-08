@@ -90,6 +90,9 @@ export const manualSourcePath = writable<string>("");
 // Scroll-to-line request — set when navigating to a breakpoint, consumed by SourcePanel
 export const scrollToLineRequest = writable<number>(0);
 
+// Search result highlight — set when clicking a search result, consumed by SourcePanel
+export const searchHighlightLine = writable<number>(0);
+
 // Per-session state
 type SessionState = {
   output: { cat: string; text: string }[];
@@ -492,7 +495,6 @@ export async function readFile(path: string): Promise<string> {
 // Wire Wails events.
 Events.On("session:event", wrapHandler("session:event", async (ev: any) => {
   const e: SessionEvent = ev.data;
-  console.debug("[session:event]", e);
   ensureSession(e.sessionId);
   // Auto-register a placeholder session so panes have something to display
   // before SessionService.Start() resolves. The event carries cfgId so we

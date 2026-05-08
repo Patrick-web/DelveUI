@@ -39,39 +39,41 @@
   let quickOpenOpen = false;
   let showWelcome = false;
 
-  onMount(async () => {
+  onMount(() => {
     startMainThreadProbe();
     if (/Mac/i.test(navigator.platform) || /Mac/i.test(navigator.userAgent)) {
       document.body.classList.add("mac");
     }
-    const { Events } = await import("@wailsio/runtime");
-    Events.On("menu:command-palette", () => (paletteOpen = true));
-    Events.On("menu:quick-open", () => (quickOpenOpen = true));
-    Events.On("menu:open-folder", () => pickWorkspaceFolder());
-    Events.On("menu:debug-control", (e: any) => {
-      const action = (e?.data ?? e) as string;
-      const id = $activeSessionId;
-      if (!id) return;
-      if (action === "Stop") stopSession(id);
-      else control(action as any, id);
-    });
+    void (async () => {
+      const { Events } = await import("@wailsio/runtime");
+      Events.On("menu:command-palette", () => (paletteOpen = true));
+      Events.On("menu:quick-open", () => (quickOpenOpen = true));
+      Events.On("menu:open-folder", () => pickWorkspaceFolder());
+      Events.On("menu:debug-control", (e: any) => {
+        const action = (e?.data ?? e) as string;
+        const id = $activeSessionId;
+        if (!id) return;
+        if (action === "Stop") stopSession(id);
+        else control(action as any, id);
+      });
 
+      await refreshWorkspace();
+      await refreshSessions();
+      const list = Object.values($sessions);
+      if (list.length && !$activeSessionId) activeSessionId.set(list[0].id);
+
+      const { loadDebugFiles } = await import("./lib/settings-store");
+      await loadDebugFiles();
+      // Welcome page shows when nothing is open — the Welcome page itself
+      // lists recents alongside Open Folder, so it's a useful landing
+      // surface even when the user already has registered projects (e.g.
+      // they turned off "Restore last project" in settings).
+      if (!$workspace?.root && !$workspace?.debugFile) {
+        showWelcome = true;
+      }
+    })();
     window.addEventListener("keydown", onLayoutKey);
     initSearchEvents();
-    await refreshWorkspace();
-    await refreshSessions();
-    const list = Object.values($sessions);
-    if (list.length && !$activeSessionId) activeSessionId.set(list[0].id);
-
-    const { loadDebugFiles } = await import("./lib/settings-store");
-    await loadDebugFiles();
-    // Welcome page shows when nothing is open — the Welcome page itself lists
-    // recents alongside Open Folder, so it's a useful landing surface even
-    // when the user already has registered projects (e.g. they turned off
-    // "Restore last project" in settings).
-    if (!$workspace?.root && !$workspace?.debugFile) {
-      showWelcome = true;
-    }
 
     return () => window.removeEventListener("keydown", onLayoutKey);
   });

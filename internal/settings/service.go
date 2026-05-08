@@ -33,6 +33,11 @@ type Settings struct {
 	RightPanels    []string `json:"rightPanels"`
 	DefaultLeftTab  string  `json:"defaultLeftTab"`
 	DefaultRightTab string  `json:"defaultRightTab"`
+
+	// RunTargetTrimLevels limits the folder depth displayed in run target
+	// labels. 0 shows the full path; any positive value keeps only the last
+	// N directory levels. Defaults to 2.
+	RunTargetTrimLevels *int `json:"runTargetTrimLevels,omitempty"`
 }
 
 type Service struct {
@@ -105,6 +110,10 @@ func (s *Service) applyDefaults() {
 	}
 	if s.data.VimMappings == nil {
 		s.data.VimMappings = []VimMapping{}
+	}
+	if s.data.RunTargetTrimLevels == nil {
+		d := 2
+		s.data.RunTargetTrimLevels = &d
 	}
 }
 

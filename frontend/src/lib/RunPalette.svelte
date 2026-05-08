@@ -11,7 +11,9 @@
     type RunTarget,
   } from "./store";
   import { recency } from "./recency-store";
+  import { appSettings } from "./settings-store";
   import Icon from "./Icon.svelte";
+  import { getRunTargetIcon } from "./file-icons";
 
   export let open = false;
 
@@ -138,6 +140,25 @@
   async function onRefresh() {
     await refreshTargets();
   }
+
+  function trimToFolderLevels(name: string, maxLevels = 2): string {
+    const m = name.match(/^(test|benchmark|example|attach):\s+/);
+    let prefix = "";
+    let rest = name;
+    if (m) {
+      prefix = m[0];
+      rest = name.slice(m[0].length);
+    }
+    let dotSlash = "";
+    if (rest.startsWith("./")) {
+      dotSlash = "./";
+      rest = rest.slice(2);
+    }
+    const parts = rest.split("/");
+    if (parts.length <= maxLevels) return name;
+    return prefix + dotSlash + parts.slice(-maxLevels).join("/");
+  }
+
 </script>
 
 {#if open}
@@ -239,19 +260,18 @@
               <button
                 class="rp-item"
                 disabled={isLaunching}
-                title={t.description ?? ""}
+                title={t.description ? `${t.label}\n${t.description}` : t.label}
                 on:click={() => onLaunchTarget(t.id)}
               >
                 {#if isLaunching}
                   <span class="rp-spin"></span>
                 {:else}
-                  <span class="rp-dot rp-dot-{t.kind}"></span>
+                  <span class="rp-icon">
+                    <Icon icon={getRunTargetIcon(t)} size={14} />
+                  </span>
                 {/if}
                 <div class="rp-item-body">
-                  <span class="rp-item-name">{t.label}</span>
-                  {#if t.description}
-                    <span class="rp-item-sub">{t.description}</span>
-                  {/if}
+                  <span class="rp-item-name">{trimToFolderLevels(t.label, $appSettings.runTargetTrimLevels ?? 2)}</span>
                 </div>
                 <span class="rp-kind">{t.kind}</span>
               </button>
@@ -409,6 +429,7 @@
   }
   .rp-item:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
   .rp-item:disabled { cursor: default; opacity: 0.7; }
+  .rp-item + .rp-item { border-top: 1px solid var(--border-subtle); }
   .rp-item-body {
     flex: 1;
     min-width: 0;
@@ -422,14 +443,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .rp-item-sub {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-faint);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .rp-kind {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -439,18 +452,14 @@
     flex-shrink: 0;
   }
 
-  .rp-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
+  .rp-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
     flex-shrink: 0;
   }
-  .rp-dot-run { background: #4cc38a; }
-  .rp-dot-test { background: #f5a623; }
-  .rp-dot-attach { background: #b083ee; }
-  .rp-dot-benchmark { background: #5ec1e4; }
-  .rp-dot-example { background: #e4906c; }
 
   .rp-spin {
     display: inline-block;

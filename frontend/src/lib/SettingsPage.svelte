@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from "svelte";
   import Icon from "./Icon.svelte";
+  import Slider from "./Slider.svelte";
   import {
     appSettings,
     debugFiles,
@@ -206,6 +207,7 @@
     { id: "terminal-theme", label: "Terminal Theme", keywords: "color follow editor", tab: "terminal" },
     { id: "debugfiles-projects", label: "Projects", description: "Registered folders", keywords: "folder workspace project import open debug launch json file", tab: "debugfiles" },
     { id: "general-toggles", label: "Restore last project on launch", description: "Reopen the most recent project at startup", keywords: "startup autoload reopen launch session", tab: "general" },
+    { id: "general-trim-levels", label: "Run target label depth", description: "Folder levels shown in run target names", keywords: "trim truncate folder path depth label run target", tab: "general" },
     { id: "vim-toggle", label: "Vim Mode", description: "Vim keybindings in the source editor", keywords: "vi keybindings editor modal", tab: "vim" },
     { id: "vim-mappings", label: "Vim Custom Mappings", description: "Define your own vim key mappings", keywords: "vim map remap keybinding lhs rhs normal visual insert", tab: "vim" },
     { id: "vim-cheatsheet", label: "Vim Cheat Sheet", description: "Reference of common vim bindings", keywords: "vim cheat reference motion editing visual search", tab: "vim" },
@@ -252,6 +254,7 @@
     uiFontSize: 13, bufferFontSize: 13, termFontSize: 12, lineHeight: "standard",
     dlvPath: "", restoreLastProject: true,
     leftPanels: [], rightPanels: [], defaultLeftTab: "", defaultRightTab: "",
+    runTargetTrimLevels: 2,
   };
   let previewTheme: string | null = null;
   let committed = false;
@@ -682,12 +685,12 @@
           <div class="card-header"><span class="card-title">Font Sizes</span></div>
           <div class="card-row">
             <span class="card-info"><span class="card-title">UI</span></span>
-            <input type="range" min="10" max="18" bind:value={settings.uiFontSize} on:input={() => updateSetting("uiFontSize", settings.uiFontSize)} />
+            <Slider min={10} max={18} bind:value={settings.uiFontSize} on:change={() => updateSetting("uiFontSize", settings.uiFontSize)} />
             <span class="val">{settings.uiFontSize}px</span>
           </div>
           <div class="card-row">
             <span class="card-info"><span class="card-title">Editor</span></span>
-            <input type="range" min="10" max="22" bind:value={settings.bufferFontSize} on:input={() => updateSetting("bufferFontSize", settings.bufferFontSize)} />
+            <Slider min={10} max={22} bind:value={settings.bufferFontSize} on:change={() => updateSetting("bufferFontSize", settings.bufferFontSize)} />
             <span class="val">{settings.bufferFontSize}px</span>
           </div>
         </div>
@@ -708,7 +711,7 @@
         <div class="card" id="terminal-font">
           <div class="card-header"><span class="card-title">Font Size</span></div>
           <div class="card-row">
-            <input type="range" min="9" max="20" bind:value={settings.termFontSize} on:input={() => updateSetting("termFontSize", settings.termFontSize)} />
+            <Slider min={9} max={20} bind:value={settings.termFontSize} on:change={() => updateSetting("termFontSize", settings.termFontSize)} />
             <span class="val">{settings.termFontSize}px</span>
           </div>
         </div>
@@ -963,6 +966,33 @@
           </div>
         </div>
 
+        <div class="card" id="general-trim-levels">
+          <div class="card-header">
+            <div class="card-info">
+              <span class="card-title">Run Target Label Depth</span>
+              <span class="card-desc">How many folder levels to show in run/target names in the sidebar. Hover to see the full path.</span>
+            </div>
+          </div>
+          <div class="card-row">
+            <div class="btn-group" role="radiogroup" aria-label="Run target label depth">
+              {#each [
+                { value: 0, label: "Full" },
+                { value: 1, label: "1 level" },
+                { value: 2, label: "2 levels" },
+                { value: 3, label: "3 levels" },
+              ] as opt}
+                <button
+                  class="seg"
+                  class:active={(settings.runTargetTrimLevels ?? 2) === opt.value}
+                  on:click={() => updateSetting("runTargetTrimLevels", opt.value)}
+                >
+                  {opt.label}
+                </button>
+              {/each}
+            </div>
+          </div>
+        </div>
+
         <div class="card" id="general-shortcuts">
           <div class="card-header"><span class="card-title">Keyboard Shortcuts</span></div>
           <div class="shortcuts">
@@ -1182,7 +1212,6 @@
   .sm { font-size:var(--text-xs); padding:3px 8px; height:auto; }
 
   .val { font-family:var(--font-mono); font-size:var(--text-sm); color:var(--text-faint); min-width:36px; text-align:right; }
-  input[type="range"] { flex:1; max-width:200px; accent-color:var(--accent); height:4px; }
 
   /* Segmented buttons */
   .btn-group { display:flex; gap:0; }

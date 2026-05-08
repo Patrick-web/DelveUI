@@ -28,6 +28,10 @@ export type AppSettings = {
   rightPanels: string[];
   defaultLeftTab: string;
   defaultRightTab: string;
+  // runTargetTrimLevels limits folder depth in run target labels. 0 = full
+  // path; defaults to 2 (last 2 directory levels). Backend uses *int so
+  // frontend treats undefined as 2.
+  runTargetTrimLevels?: number;
 };
 
 export type DebugFileEntry = {
@@ -61,6 +65,7 @@ export const appSettings = writable<AppSettings>({
   rightPanels: ["terminal", "console"],
   defaultLeftTab: "breakpoints",
   defaultRightTab: "terminal",
+  runTargetTrimLevels: 2,
 });
 
 export const debugFiles = writable<DebugFileEntry[]>([]);
@@ -78,7 +83,13 @@ export async function loadSettings() {
 
 export function applyFontSettings(s: AppSettings) {
   const root = document.documentElement;
-  if (s.uiFontSize) root.style.setProperty("--text-md", s.uiFontSize + "px");
+  if (s.uiFontSize) {
+    const base = s.uiFontSize;
+    root.style.setProperty("--text-xs", Math.round(base * (11 / 13)) + "px");
+    root.style.setProperty("--text-sm", Math.round(base * (13 / 13)) + "px");
+    root.style.setProperty("--text-md", base + "px");
+    root.style.setProperty("--text-lg", Math.round(base * (14 / 13)) + "px");
+  }
   if (s.termFontSize) root.style.setProperty("--text-term", s.termFontSize + "px");
   if (s.lineHeight) {
     const lh = s.lineHeight === "compact" ? "1.2" : s.lineHeight === "comfortable" ? "1.618" : "1.3";

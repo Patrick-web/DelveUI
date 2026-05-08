@@ -26,11 +26,13 @@ export function wrapHandler<T extends (...args: any[]) => any>(
 }
 
 let probeStarted = false;
+let _probeHandle: number | null = null;
+
 export function startMainThreadProbe() {
   if (probeStarted) return;
   probeStarted = true;
   let last = performance.now();
-  setInterval(() => {
+  _probeHandle = window.setInterval(() => {
     const now = performance.now();
     const gap = now - last;
     last = now;
@@ -40,4 +42,12 @@ export function startMainThreadProbe() {
       );
     }
   }, PROBE_INTERVAL_MS);
+}
+
+export function stopMainThreadProbe() {
+  if (_probeHandle !== null) {
+    clearInterval(_probeHandle);
+    _probeHandle = null;
+    probeStarted = false;
+  }
 }

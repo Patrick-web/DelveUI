@@ -7,7 +7,7 @@
   import { vim, Vim } from "@replit/codemirror-vim";
   import { search, openSearchPanel, searchKeymap } from "@codemirror/search";
   import { history, historyKeymap } from "@codemirror/commands";
-  import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, scrollToLineRequest, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes, workspace } from "./store";
+  import { activeSessionId, activeSession, sessionState, selectedFrame, selectedFrameId, manualSourcePath, scrollToLineRequest, searchHighlightLine, setBreakpoints, globalBreakpoints, fetchVariables, fetchScopes, workspace } from "./store";
   import * as FileService from "../../bindings/github.com/jp/DelveUI/internal/services/fileservice";
   import { showInfo, showError } from "./toast";
   import { appSettings } from "./settings-store";
@@ -48,6 +48,15 @@
   $: if (view && $scrollToLineRequest > 0) {
     scrollToLine($scrollToLineRequest);
     scrollToLineRequest.set(0);
+  }
+
+  // Highlight search result line
+  $: if (view && $searchHighlightLine > 0) {
+    const doc = view.state.doc;
+    const line = $searchHighlightLine;
+    if (line > 0 && line <= doc.lines) {
+      view.dispatch({ effects: setSearchHighlightLine.of(doc.line(line).from) });
+    }
   }
 
   async function loadFile(filePath: string) {
@@ -99,6 +108,26 @@
   });
 
   const setAllBreakpoints = StateEffect.define<number[]>();
+
+  // Search result line highlight
+  const setSearchHighlightLine = StateEffect.define<number>(); // pos or -1 to clear
+  const searchHighlightDecor = Decoration.line({ class: "cm-search-highlight-line" });
+
+  const searchHighlightField = StateField.define<DecorationSet>({
+    create() { return Decoration.none; },
+    update(set, tr) {
+      for (const e of tr.effects) {
+        if (e.is(setSearchHighlightLine)) {
+          if (e.value >= 0) {
+            return Decoration.set([searchHighlightDecor.range(e.value)]);
+          }
+          return Decoration.none;
+        }
+      }
+      return set.map(tr.changes);
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  });
 
   // Current stopped line highlight
   const setCurrentLine = StateEffect.define<number>(); // pos or -1 to clear
@@ -293,6 +322,7 @@
       breakpointGutter,
       breakpointState,
       currentLineField,
+      searchHighlightField,
       EditorView.theme({
         "&": { height: "100%" },
         ".cm-content": { fontFamily: "var(--font-mono)", padding: "0" },
@@ -326,6 +356,7 @@
           opacity: "0.35",
         },
         ".cm-stopped-line": { backgroundColor: "rgba(229,192,123,0.15)", borderLeft: "2px solid var(--warning)" },
+        ".cm-search-highlight-line": { backgroundColor: "rgba(255,204,0,0.12)" },
         ".cm-activeLine": { backgroundColor: "rgba(91,135,214,0.08)" },
         ".cm-activeLineGutter": { backgroundColor: "rgba(91,135,214,0.08)" },
         "&.cm-focused": { outline: "none" },

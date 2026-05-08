@@ -16,6 +16,8 @@
     dismissSession,
   } from "./store";
   import { recency } from "./recency-store";
+  import { appSettings } from "./settings-store";
+  import { getRunTargetIcon } from "./file-icons";
   import Icon from "./Icon.svelte";
 
   type Target = {
@@ -34,7 +36,6 @@
   let filter = "";
   let pidInput = "";
   let attachOpen = false;
-  let envPopoverFor = "";
   // Targets where the user has clicked Run but launchTarget() hasn't returned
   // yet. Discovery-launched sessions don't get a session:event placeholder
   // (their cfgId isn't in workspace.configs), so without this the row stays
@@ -121,20 +122,6 @@
     attachOpen = false;
   }
 
-  function envBadgeLabel(t: Target): string {
-    const n = t.envFiles?.length ?? 0;
-    return n === 1 ? "env: 1 file" : `env: ${n} files`;
-  }
-
-  function basename(p: string): string {
-    return p.split("/").pop() ?? p;
-  }
-
-  function shorten(p: string, root?: string): string {
-    if (root && p.startsWith(root + "/")) return p.slice(root.length + 1);
-    return p;
-  }
-
   function lastScannedText(d: Date | null): string {
     if (!d) return "";
     const sec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
@@ -171,9 +158,24 @@
     refreshTargets().catch(() => {});
   }
 
-  function toggleEnvPopover(id: string) {
-    envPopoverFor = envPopoverFor === id ? "" : id;
+  function trimToFolderLevels(name: string, maxLevels = 2): string {
+    const m = name.match(/^(test|benchmark|example|attach):\s+/);
+    let prefix = "";
+    let rest = name;
+    if (m) {
+      prefix = m[0];
+      rest = name.slice(m[0].length);
+    }
+    let dotSlash = "";
+    if (rest.startsWith("./")) {
+      dotSlash = "./";
+      rest = rest.slice(2);
+    }
+    const parts = rest.split("/");
+    if (parts.length <= maxLevels) return name;
+    return prefix + dotSlash + parts.slice(-maxLevels).join("/");
   }
+
 </script>
 
 <div class="rt-root">
@@ -255,27 +257,20 @@
             <div
               class="rt-row"
               class:active={sess && sess.id === $activeSessionId}
-              title={t.description ?? ""}
+              title={t.description ? `${t.label}\n${t.description}` : t.label}
               role={sess ? "button" : undefined}
               tabindex={sess ? 0 : -1}
               on:click={() => sess && onSelect(sess.id)}
             >
-              <span class="rt-kind rt-kind-{t.kind} rt-state-{state}"></span>
-              <span class="rt-label">
-                <span class="rt-label-main">{t.label}</span>
-                {#if t.description}
-                  <span class="rt-label-sub">{t.description}</span>
-                {/if}
-              </span>
-              {#if t.envFiles && t.envFiles.length > 0}
-                <button
-                  class="rt-env-badge"
-                  title={t.envFiles.join("\n")}
-                  on:click|stopPropagation={() => toggleEnvPopover(t.id)}
-                >
-                  {envBadgeLabel(t)}
-                </button>
+              <Icon icon={getRunTargetIcon(t)} size={14} />
+              {#if live || state === "starting"}
+                <span class="rt-state-dot rt-state-{state}"></span>
+              {:else}
+                <span class="rt-state-dot rt-state-idle"></span>
               {/if}
+              <span class="rt-label">
+                <span class="rt-label-main">{trimToFolderLevels(t.label, $appSettings.runTargetTrimLevels ?? 2)}</span>
+              </span>
               <span class="rt-actions">
                 {#if state === "starting"}
                   <span class="rt-spinner" title="Starting…" aria-label="Starting"></span>
@@ -314,20 +309,6 @@
                 {/if}
               </span>
             </div>
-            {#if envPopoverFor === t.id && t.envFiles}
-              <div class="rt-env-popover">
-                <div class="rt-env-popover-head">
-                  Env files (outer → inner, last wins)
-                </div>
-                {#each t.envFiles as f}
-                  <div class="rt-env-popover-row" title={f}>
-                    <Icon icon="solar:document-text-linear" size={11} />
-                    <span class="rt-env-popover-name">{basename(f)}</span>
-                    <span class="rt-env-popover-path">{shorten(f, $workspace?.root)}</span>
-                  </div>
-                {/each}
-              </div>
-            {/if}
           {/each}
         </div>
       {/each}
@@ -482,24 +463,28 @@
   .rt-row[role="button"] { cursor: pointer; }
   .rt-row:hover { background: rgba(255, 255, 255, 0.04); }
   .rt-row.active { background: var(--accent); color: #fff; }
-  .rt-row.active .rt-label-sub { color: rgba(255,255,255,0.65); }
+  .rt-row + .rt-row { border-top: 1px solid var(--border-subtle); }
 
-  .rt-kind {
+  .rt-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .rt-state-dot {
     display: inline-block;
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .rt-kind-run { background: #4cc38a; }
-  .rt-kind-test { background: #f5a623; }
-  .rt-kind-attach { background: #b083ee; }
-  .rt-kind-benchmark { background: #5ec1e4; }
-  .rt-kind-example { background: #e4906c; }
-  /* Live-state pulse: takes precedence over kind colour while a session is up. */
-  .rt-state-running { background: var(--success) !important; box-shadow: 0 0 6px var(--success); }
-  .rt-state-stopped { background: var(--warning, #f5a623) !important; box-shadow: 0 0 6px rgba(245,166,35,0.6); }
-  .rt-state-starting { background: var(--text-faint) !important; animation: rt-blink 1s linear infinite; }
+  .rt-state-idle { background: transparent; }
+  .rt-state-running { background: var(--success); box-shadow: 0 0 5px var(--success); }
+  .rt-state-stopped { background: var(--warning, #f5a623); box-shadow: 0 0 5px rgba(245,166,35,0.6); }
+  .rt-state-starting { background: var(--text-faint); animation: rt-blink 1s linear infinite; }
   @keyframes rt-blink { 50% { opacity: 0.3; } }
 
   .rt-actions { display: inline-flex; gap: 2px; flex-shrink: 0; }
@@ -534,28 +519,6 @@
     white-space: nowrap;
     line-height: 1.1;
   }
-  .rt-label-sub {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    line-height: 1.1;
-  }
-
-  .rt-env-badge {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border-subtle);
-    border-radius: 3px;
-    color: var(--text-faint);
-    cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: 9px;
-    padding: 2px 6px;
-    flex-shrink: 0;
-  }
-  .rt-env-badge:hover { color: var(--text); border-color: var(--accent); }
 
   .rt-act {
     display: inline-flex;
@@ -574,43 +537,6 @@
   .rt-row:hover .rt-act { opacity: 1; }
   .rt-act:hover { background: rgba(255,255,255,0.1); }
   .rt-act-play { color: var(--success); }
-
-  .rt-env-popover {
-    margin: 2px 8px 6px 24px;
-    padding: 6px 8px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    font-size: var(--text-xs);
-  }
-  .rt-env-popover-head {
-    color: var(--text-faint);
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-  }
-  .rt-env-popover-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 0;
-    color: var(--text-muted);
-  }
-  .rt-env-popover-name {
-    font-family: var(--font-mono);
-    color: var(--text);
-  }
-  .rt-env-popover-path {
-    margin-left: auto;
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 
   .rt-footer {
     flex-shrink: 0;

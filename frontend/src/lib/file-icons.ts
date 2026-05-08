@@ -408,3 +408,28 @@ export function getFolderIcon(name: string, open: boolean): string {
   }
   return open ? icon("default-folder-opened") : icon("default-folder");
 }
+
+const providerFallback: Record<string, string> = {
+  go: icon("file-type-go"),
+  node: icon("file-type-js"),
+  python: icon("file-type-python"),
+};
+
+// Resolve a file-explorer-style icon for a run/debug target. Prefers the
+// detected source file's extension (so e.g. a TS entrypoint shows the TS
+// icon, not a generic "node" badge), falls back to the program path, then
+// finally to a provider-based default. Attach targets discovered with a
+// source file get the same treatment; otherwise we use the provider icon.
+export function getRunTargetIcon(t: {
+  provider?: string;
+  sourceFile?: string;
+  program?: string;
+}): string {
+  const file = t.sourceFile || t.program || "";
+  if (file) {
+    const base = file.split("/").pop() || file;
+    const ico = getFileIcon(base);
+    if (ico !== icon("default-file")) return ico;
+  }
+  return providerFallback[t.provider ?? ""] ?? icon("default-file");
+}

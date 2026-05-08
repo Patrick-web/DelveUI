@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import Icon from "./Icon.svelte";
-  import { manualSourcePath, scrollToLineRequest } from "./store";
+  import { manualSourcePath, scrollToLineRequest, searchHighlightLine } from "./store";
   import { setActivePanel } from "./panels/layout";
   import {
     searchState,
@@ -75,6 +75,7 @@
   function openMatch(m: SearchMatch) {
     manualSourcePath.set(m.path);
     setActivePanel("right", "source");
+    searchHighlightLine.set(m.line);
     // Two-step set lets SourcePanel react in two phases: file load, then scroll.
     tick().then(() => scrollToLineRequest.set(m.line));
   }

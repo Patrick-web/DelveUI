@@ -27,6 +27,13 @@ export class Settings {
     "defaultLeftTab": string;
     "defaultRightTab": string;
 
+    /**
+     * RunTargetTrimLevels limits the folder depth displayed in run target
+     * labels. 0 shows the full path; any positive value keeps only the last
+     * N directory levels. Defaults to 2.
+     */
+    "runTargetTrimLevels"?: number | null;
+
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
         if (!("theme" in $$source)) {

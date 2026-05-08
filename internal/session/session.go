@@ -140,6 +140,9 @@ func (s *Session) start(ctx context.Context, spec adapter.ProcessSpec) error {
 					Output: fmt.Sprintf("[delveui] cleaned %d debug binary file(s)\n", len(removed))})
 			}
 		}
+		s.mu.Lock()
+		s.cmd = nil
+		s.mu.Unlock()
 		s.emit(Event{Kind: "exited", Message: fmt.Sprintf("%s adapter exited: %v", spec.Language, err)})
 		s.setState(StateExited)
 	}()
@@ -241,6 +244,11 @@ func (s *Session) ConfigurationDone() error {
 }
 
 func (s *Session) eventLoop() {
+	defer func() {
+		s.mu.Lock()
+		s.client = nil
+		s.mu.Unlock()
+	}()
 	for msg := range s.client.Events() {
 		switch ev := msg.(type) {
 		case *godap.OutputEvent:
@@ -277,9 +285,13 @@ func (s *Session) eventLoop() {
 }
 
 func (s *Session) stop() {
-	if s.client != nil {
-		_ = s.client.Disconnect(true)
-		s.client.Close()
+	s.mu.Lock()
+	client := s.client
+	s.client = nil
+	s.mu.Unlock()
+	if client != nil {
+		_ = client.Disconnect(true)
+		client.Close()
 	}
 	s.killProcess()
 	s.setState(StateExited)

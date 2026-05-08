@@ -74,6 +74,8 @@ export function PickAndScanFolder(): $CancellablePromise<$models.FolderScanResul
 
 /**
  * Scan discovers debug configs from known editor locations across the system.
+ * All store entry paths are normalized to folders, so they can be used
+ * directly as scan roots.
  */
 export function Scan(): $CancellablePromise<$models.DetectedSource[]> {
     return $Call.ByID(1470118857).then(($result: any) => {

@@ -1,13 +1,19 @@
 import { writable, get } from "svelte/store";
 
 const STORAGE_KEY = "delveui:recency:v1";
+const MAX_ENTRIES = 500;
 
 function load(): Record<string, number> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
+    if (!parsed || typeof parsed !== "object") return {};
+    const map = parsed as Record<string, number>;
+    const entries = Object.entries(map);
+    if (entries.length <= MAX_ENTRIES) return map;
+    entries.sort(([, a], [, b]) => b - a);
+    return Object.fromEntries(entries.slice(0, MAX_ENTRIES));
   } catch {
     return {};
   }
@@ -15,6 +21,13 @@ function load(): Record<string, number> {
 
 function save(map: Record<string, number>) {
   try {
+    const entries = Object.entries(map);
+    if (entries.length > MAX_ENTRIES) {
+      entries.sort(([, a], [, b]) => b - a);
+      const trimmed = Object.fromEntries(entries.slice(0, MAX_ENTRIES));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+      return;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
   } catch {}
 }

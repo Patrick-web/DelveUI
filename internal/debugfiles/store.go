@@ -113,8 +113,16 @@ func migrateLoaded(le loadedEntry) Entry {
 	if le.Kind == "folder" {
 		return e
 	}
-	// Legacy file-kind (or empty Kind from very old entries). Path points at
-	// a launch.json file; convert to its containing project folder.
+	// Legacy file-kind (or empty Kind from very old entries).
+	// If the path is already a directory on disk, treat it as a folder entry
+	// rather than resolving it to the parent directory.
+	if le.Kind == "" {
+		if info, err := os.Stat(le.Path); err == nil && info.IsDir() {
+			return e
+		}
+	}
+	// Legacy file-kind. Path points at a launch.json file;
+	// convert to its containing project folder.
 	parent := filepath.Dir(le.Path)
 	parentBase := filepath.Base(parent)
 	switch parentBase {

@@ -25,18 +25,12 @@ func NewService(store *debugfiles.Store) *Service {
 func (s *Service) SetApp(app *application.App) { s.app = app }
 
 // Scan discovers debug configs from known editor locations across the system.
+// All store entry paths are normalized to folders, so they can be used
+// directly as scan roots.
 func (s *Service) Scan() []DetectedSource {
 	var roots []string
 	for _, e := range s.store.List() {
-		dir := filepath.Dir(e.Path)
-		// Walk up to find project root (parent of .zed/.vscode)
-		for _, sub := range []string{".zed", ".vscode"} {
-			if filepath.Base(dir) == sub {
-				dir = filepath.Dir(dir)
-				break
-			}
-		}
-		roots = append(roots, filepath.Dir(dir))
+		roots = append(roots, e.Path)
 	}
 	return Scan(s.app, roots)
 }
