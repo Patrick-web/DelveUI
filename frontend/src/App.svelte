@@ -152,6 +152,14 @@
 
     <div class="tb-left">
       <ProjectSwitcher />
+      <button
+        class="tb-icon"
+        class:active={$layout.visible.sidebar}
+        title="Toggle Sidebar (⌘0)"
+        on:click={() => toggleArea("sidebar")}
+      >
+        <Icon icon="solar:sidebar-minimalistic-linear" size={15} />
+      </button>
     </div>
 
     <div class="tb-center">
@@ -163,6 +171,15 @@
     </div>
 
     <div class="tb-right">
+      <button
+        class="tb-icon"
+        class:active={$layout.visible.inspector}
+        title="Toggle Inspector (⌘⌥0)"
+        on:click={() => toggleArea("inspector")}
+      >
+        <Icon icon="solar:sidebar-code-linear" size={15} />
+      </button>
+
       {#if $activeSession}
         <div class="segmented step-controls">
           <button class="seg" title="Continue (F5)" on:click={() => $activeSessionId && control("Continue", $activeSessionId)}>
@@ -333,7 +350,9 @@
   .tb-icon:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); border-color: var(--border-subtle); }
   /* The segmented step-control group is also interactive. */
   .step-controls { --wails-draggable: no-drag; }
-  .step-controls .seg { width: 28px; padding: 0; }
+  .step-controls .seg { padding: 5px 8px; }
+
+  .tb-icon.active { color: var(--accent); }
 
   .workspace {
     flex: 1;
