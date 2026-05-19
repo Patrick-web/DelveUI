@@ -267,9 +267,17 @@ func (s *SessionService) Restart(id string) (StartResult, error) {
 	if sess == nil {
 		return StartResult{}, errors.New("session not found")
 	}
-	cfgID := sess.CfgID
+	cfg := sess.Cfg
 	_ = s.mgr.Stop(id)
-	return s.Start(cfgID)
+	sess2, err := s.mgr.Start(context.Background(), cfg)
+	result := StartResult{}
+	if sess2 != nil {
+		result.Session = toInfo(sess2)
+	}
+	if err != nil {
+		result.Error = err.Error()
+	}
+	return result, nil
 }
 
 func (s *SessionService) SetExceptionBreakpoints(id string, filters []string) error {
