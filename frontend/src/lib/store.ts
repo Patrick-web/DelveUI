@@ -549,9 +549,10 @@ Events.On("session:event", wrapHandler("session:event", async (ev: any) => {
   } else if (e.kind === "output") {
     sessionState.update((m) => {
       ensureSession(e.sessionId);
-      m[e.sessionId].output.push({ cat: e.category ?? "output", text: e.output ?? "" });
-      if (m[e.sessionId].output.length > 2000)
-        m[e.sessionId].output.splice(0, m[e.sessionId].output.length - 2000);
+      const s = m[e.sessionId];
+      const out = [...s.output, { cat: e.category ?? "output", text: e.output ?? "" }];
+      if (out.length > 10000) out.splice(0, out.length - 10000);
+      m[e.sessionId] = { ...s, output: out };
       return { ...m };
     });
     // Detect port-in-use errors

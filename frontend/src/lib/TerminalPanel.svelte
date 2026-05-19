@@ -92,7 +92,7 @@
 {/if}
 
 <div class="body">
-  <TerminalPane lines={filteredOutput} {searchQuery} bind:matchCount />
+  <TerminalPane lines={filteredOutput} filterMode={filter} {searchQuery} bind:matchCount />
 </div>
 
 <style>

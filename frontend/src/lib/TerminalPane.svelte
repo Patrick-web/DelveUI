@@ -1,107 +1,125 @@
 <script lang="ts">
-  import { afterUpdate } from "svelte";
-  import { AnsiUp } from "ansi_up";
+  import { onMount } from "svelte";
+  import { Terminal } from "@xterm/xterm";
+  import { FitAddon } from "@xterm/addon-fit";
+  import { WebglAddon } from "@xterm/addon-webgl";
+  import { SearchAddon } from "@xterm/addon-search";
+  import "@xterm/xterm/css/xterm.css";
 
   export let lines: { cat: string; text: string }[] = [];
-  export let filter: (cat: string) => boolean = () => true;
+  export let filterMode: string = "all";
   export let searchQuery: string = "";
   export let matchCount: number = 0;
 
-  const ansi = new AnsiUp();
-  ansi.use_classes = true;
+  let container: HTMLDivElement;
+  let terminal: Terminal;
+  let fitAddon: FitAddon;
+  let searchAddon: SearchAddon;
+  let syncedLen = 0;
+  let lastFilter = filterMode;
 
-  let el: HTMLDivElement;
-  let atBottom = true;
+  onMount(() => {
+    terminal = new Terminal({
+      scrollback: 10000,
+      disableStdin: true,
+      cursorBlink: false,
+      convertEol: true,
+      fontFamily:
+        'ui-monospace, "SF Mono", "IBM Plex Mono", "JetBrains Mono", SFMono-Regular, Menlo, monospace',
+      fontSize: 12,
+      theme: {
+        background: "#0f1115",
+        foreground: "#d8dbe1",
+        cursor: "#4d9cff",
+        black: "#282c34",
+        red: "#e06c75",
+        green: "#98c379",
+        yellow: "#e5c07b",
+        blue: "#61afef",
+        magenta: "#c678dd",
+        cyan: "#56b6c2",
+        white: "#abb2bf",
+        brightBlack: "#5c6370",
+        brightRed: "#e06c75",
+        brightGreen: "#98c379",
+        brightYellow: "#e5c07b",
+        brightBlue: "#61afef",
+        brightMagenta: "#c678dd",
+        brightCyan: "#56b6c2",
+        brightWhite: "#ffffff",
+        selectionBackground: "#4d9cff40",
+      },
+    });
 
-  // Cache ansi→html and the wrapping span per line object. Lines are pushed
-  // once and never mutated by the store, so identity is stable for their lifetime.
-  // Without this, every output event re-parses every history line — the dominant
-  // cost on long-running, chatty sessions.
-  type Line = { cat: string; text: string };
-  const ansiCache = new WeakMap<Line, string>();
-  const wrappedCache = new WeakMap<Line, string>(); // `<span class="cat-X">…</span>`
+    fitAddon = new FitAddon();
+    searchAddon = new SearchAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.loadAddon(searchAddon);
 
-  function wrappedFor(l: Line): string {
-    let w = wrappedCache.get(l);
-    if (w !== undefined) return w;
-    let h = ansiCache.get(l);
-    if (h === undefined) {
-      h = ansi.ansi_to_html(l.text);
-      ansiCache.set(l, h);
+    try {
+      terminal.loadAddon(new WebglAddon());
+    } catch {
+      // canvas renderer fallback
     }
-    w = `<span class="cat-${l.cat}">${h}</span>`;
-    wrappedCache.set(l, w);
-    return w;
-  }
 
-  $: rendered = buildRendered(lines, searchQuery);
+    terminal.open(container);
 
-  function buildRendered(lines: Line[], query: string): string {
-    // Hot path: no search query. Pure cache lookup + concat.
-    if (!query) {
-      matchCount = 0;
-      let out = "";
-      for (let i = 0; i < lines.length; i++) {
-        const l = lines[i];
-        if (!filter(l.cat)) continue;
-        out += wrappedFor(l);
-      }
-      return out;
-    }
+    for (const l of lines) terminal.write(l.text);
+    syncedLen = lines.length;
 
-    // Search path: highlight matches on top of cached ansi html.
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`(${escaped})`, "gi");
-    let count = 0;
-    let out = "";
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i];
-      if (!filter(l.cat)) continue;
-      let h = ansiCache.get(l);
-      if (h === undefined) {
-        h = ansi.ansi_to_html(l.text);
-        ansiCache.set(l, h);
-      }
-      const highlighted = h.replace(re, (m) => {
-        count++;
-        return `<mark class="search-hl">${m}</mark>`;
-      });
-      out += `<span class="cat-${l.cat}">${highlighted}</span>`;
-    }
-    matchCount = count;
-    return out;
-  }
+    const ro = new ResizeObserver(() => {
+      try {
+        fitAddon.fit();
+      } catch {}
+    });
+    ro.observe(container);
 
-  afterUpdate(() => {
-    if (el && atBottom) el.scrollTop = el.scrollHeight;
+    searchAddon.onDidChangeResults((e) => {
+      matchCount = e.resultCount;
+    });
+
+    return () => {
+      ro.disconnect();
+      terminal.dispose();
+    };
   });
 
-  function onScroll() {
-    if (!el) return;
-    atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  $: if (terminal && filterMode !== lastFilter) {
+    terminal.reset();
+    for (const l of lines) terminal.write(l.text);
+    syncedLen = lines.length;
+    lastFilter = filterMode;
+    if (searchQuery) searchAddon.findNext(searchQuery);
+  }
+
+  $: if (terminal && lines.length > syncedLen) {
+    for (let i = syncedLen; i < lines.length; i++) terminal.write(lines[i].text);
+    syncedLen = lines.length;
+  }
+
+  $: if (terminal && lines.length < syncedLen) {
+    terminal.clear();
+    syncedLen = 0;
+    lastFilter = filterMode;
+    for (const l of lines) terminal.write(l.text);
+    syncedLen = lines.length;
+  }
+
+  $: if (terminal && searchAddon) {
+    if (searchQuery) {
+      searchAddon.findNext(searchQuery);
+    } else {
+      searchAddon.clearDecorations();
+      matchCount = 0;
+    }
   }
 </script>
 
-<div class="term" bind:this={el} on:scroll={onScroll}>
-  {@html rendered}
-</div>
+<div class="term-container" bind:this={container}></div>
 
 <style>
-  .term {
+  .term-container {
     flex: 1;
-    overflow: auto;
-    padding: var(--space-2) var(--space-3);
-    font-family: var(--font-terminal);
-    font-size: var(--text-term, var(--text-sm));
-    line-height: var(--lh-standard);
-    white-space: pre-wrap;
-    background: var(--term-background);
-    color: var(--term-foreground);
-  }
-  .term :global(.search-hl) {
-    background: rgba(255, 204, 0, 0.3);
-    color: inherit;
-    border-radius: 2px;
-    padding: 0 1px;
+    overflow: hidden;
   }
 </style>
