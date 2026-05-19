@@ -166,55 +166,7 @@ input.tx:focus, .tx:focus {
   --term-bright-white: #ffffff;
 }
 
-/* ansi_up CSS class mode → theme-aware terminal colors */
-.ansi-black-fg   { color: var(--term-black); }
-.ansi-red-fg     { color: var(--term-red); }
-.ansi-green-fg   { color: var(--term-green); }
-.ansi-yellow-fg  { color: var(--term-yellow); }
-.ansi-blue-fg    { color: var(--term-blue); }
-.ansi-magenta-fg { color: var(--term-magenta); }
-.ansi-cyan-fg    { color: var(--term-cyan); }
-.ansi-white-fg   { color: var(--term-white); }
-
-.ansi-bright-black-fg   { color: var(--term-bright-black); }
-.ansi-bright-red-fg     { color: var(--term-bright-red); }
-.ansi-bright-green-fg   { color: var(--term-bright-green); }
-.ansi-bright-yellow-fg  { color: var(--term-bright-yellow); }
-.ansi-bright-blue-fg    { color: var(--term-bright-blue); }
-.ansi-bright-magenta-fg { color: var(--term-bright-magenta); }
-.ansi-bright-cyan-fg    { color: var(--term-bright-cyan); }
-.ansi-bright-white-fg   { color: var(--term-bright-white); }
-
-.ansi-black-bg   { background-color: var(--term-black); }
-.ansi-red-bg     { background-color: var(--term-red); }
-.ansi-green-bg   { background-color: var(--term-green); }
-.ansi-yellow-bg  { background-color: var(--term-yellow); }
-.ansi-blue-bg    { background-color: var(--term-blue); }
-.ansi-magenta-bg { background-color: var(--term-magenta); }
-.ansi-cyan-bg    { background-color: var(--term-cyan); }
-.ansi-white-bg   { background-color: var(--term-white); }
-
-.ansi-bright-black-bg   { background-color: var(--term-bright-black); }
-.ansi-bright-red-bg     { background-color: var(--term-bright-red); }
-.ansi-bright-green-bg   { background-color: var(--term-bright-green); }
-.ansi-bright-yellow-bg  { background-color: var(--term-bright-yellow); }
-.ansi-bright-blue-bg    { background-color: var(--term-bright-blue); }
-.ansi-bright-magenta-bg { background-color: var(--term-bright-magenta); }
-.ansi-bright-cyan-bg    { background-color: var(--term-bright-cyan); }
-.ansi-bright-white-bg   { background-color: var(--term-bright-white); }
-
-/* bold/dim/italic/underline/strikethrough from ansi_up */
-.ansi-bold { font-weight: 700; }
-.ansi-dim { opacity: 0.7; }
-.ansi-italic { font-style: italic; }
-.ansi-underline { text-decoration: underline; }
-.ansi-strikethrough { text-decoration: line-through; }
-
-/* terminal output category colors */
-.cat-stderr { color: var(--danger); }
-.cat-dlv-stdout, .cat-dlv-stderr { color: var(--text-muted); }
-.cat-console { color: var(--info); }
-.cat-important { color: var(--warning); }
+/* terminal colors managed by xterm.js ITheme, defined as CSS variables for theme-engine */
 
 /* splitpanes dark theme override */
 .splitpanes.default-theme .splitpanes__pane { background: var(--bg); }
