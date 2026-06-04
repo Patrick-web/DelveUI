@@ -632,9 +632,28 @@ Events.On("switch-session", (ev: any) => {
   if (sid) activeSessionId.set(sid);
 });
 
+export type UpdateInfo = {
+  available: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseUrl: string;
+  releaseNotes: string;
+};
+
+export const updateInfo = writable<UpdateInfo | null>(null);
+
+async function downloadUpdate() {
+  const { Events } = await import("@wailsio/runtime");
+  const svc = (await import("../../bindings/github.com/jp/DelveUI/internal/updater/service"));
+  svc.DownloadUpdate().catch((e: any) => {
+    Events.Emit("update:progress", { done: true, error: String(e?.message ?? e) });
+  });
+}
+
 Events.On("update:available", async (ev: any) => {
-  const info = ev.data as any;
+  const info = ev.data as UpdateInfo;
   if (!info?.available) return;
+  updateInfo.set(info);
   const { toasts, dismiss } = await import("./toast");
   const id = Date.now();
   toasts.update((list) => [
@@ -644,13 +663,39 @@ Events.On("update:available", async (ev: any) => {
       kind: "info" as const,
       title: `Update available: v${info.latestVersion}`,
       body: `You're on v${info.currentVersion}. A new version is ready.`,
-      action: {
-        label: "View release",
-        run: () => {
-          dismiss(id);
-          if (info.releaseUrl) window.open(info.releaseUrl, "_blank");
+      actions: [
+        {
+          label: "Download",
+          run: () => {
+            dismiss(id);
+            downloadUpdate();
+          },
         },
-      },
+        {
+          label: "Release notes",
+          run: () => {
+            dismiss(id);
+            showReleaseNotes(info);
+          },
+        },
+      ],
     },
   ]);
 });
+
+function showReleaseNotes(info: UpdateInfo) {
+  const el = document.createElement("div");
+  import("./ReleaseNotesModal.svelte").then(({ default: ReleaseNotesModal }) => {
+    new ReleaseNotesModal({
+      target: el,
+      props: {
+        open: true,
+        currentVersion: info.currentVersion,
+        latestVersion: info.latestVersion,
+        releaseNotes: info.releaseNotes,
+        releaseUrl: info.releaseUrl,
+      },
+    });
+    document.body.appendChild(el);
+  });
+}

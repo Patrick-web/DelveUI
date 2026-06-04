@@ -205,6 +205,25 @@ func main() {
 
 	trayCtrl := tray.New(app, win, wsSvc, sessSvc, mgr)
 
+	// macOS: clicking the dock icon when the window is hidden re-shows the
+	// main window. Hide the tray popup first to prevent it from stealing focus
+	// (it uses AlwaysOnTop).
+	app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(_ *application.ApplicationEvent) {
+		trayCtrl.TrayWin().Hide()
+		win.Show()
+		win.Focus()
+	})
+
+	// macOS fallback: ApplicationDidBecomeActive fires when the app becomes
+	// active (e.g. dock icon click, Cmd+Tab). If the main window is hidden,
+	// show it.
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidBecomeActive, func(_ *application.ApplicationEvent) {
+		if !win.IsVisible() {
+			win.Show()
+			win.Focus()
+		}
+	})
+
 	// Handle tray "open session in main window"
 	app.Event.On("tray:open-session", func(e *application.CustomEvent) {
 		if sid, ok := e.Data.(string); ok && sid != "" {

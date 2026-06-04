@@ -29,12 +29,11 @@
     return "var(--info)";
   }
 
-  function runAction(n: any) {
-    try {
-      n.action?.run();
-    } catch {}
+  function runAction(a: any) {
+    try { a?.run(); } catch {}
     onClose();
   }
+
 </script>
 
 <div class="popover" role="dialog" aria-label="Notifications">
@@ -69,8 +68,14 @@
             {#if n.body}
               <div class="t-body">{n.body}</div>
             {/if}
-            {#if n.action}
-              <button class="action" on:click={() => runAction(n)}>
+            {#if n.actions}
+              {#each n.actions as a}
+                <button class="action" on:click={() => runAction(a)}>
+                  {a.label}
+                </button>
+              {/each}
+            {:else if n.action}
+              <button class="action" on:click={() => runAction(n.action)}>
                 {n.action.label}
               </button>
             {/if}

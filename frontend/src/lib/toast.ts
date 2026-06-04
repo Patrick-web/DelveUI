@@ -2,12 +2,15 @@ import { writable, derived } from "svelte/store";
 
 export type ToastKind = "error" | "warning" | "info";
 
+export type ToastAction = { label: string; run: () => void };
+
 export type Toast = {
   id: number;
   kind: ToastKind;
   title: string;
   body?: string;
-  action?: { label: string; run: () => void };
+  action?: ToastAction;
+  actions?: ToastAction[];
 };
 
 // A notification is a toast that has been written to history. Toasts come and
@@ -18,7 +21,8 @@ export type Notification = {
   kind: ToastKind;
   title: string;
   body?: string;
-  action?: { label: string; run: () => void };
+  action?: ToastAction;
+  actions?: ToastAction[];
   ts: number;
   read: boolean;
 };
@@ -40,6 +44,7 @@ function push(t: Toast) {
       title: t.title,
       body: t.body,
       action: t.action,
+      actions: t.actions,
       ts: Date.now(),
       read: false,
     };

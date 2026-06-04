@@ -23,13 +23,19 @@
         <div class="title">{t.title}</div>
         {#if t.body}<div class="body">{t.body}</div>{/if}
       </div>
-      {#if t.action}
+      {#if t.actions}
+        {#each t.actions as a}
+          <button
+            class="btn outlined"
+            on:click={() => { a.run(); dismiss(t.id); }}
+          >
+            {a.label}
+          </button>
+        {/each}
+      {:else if t.action}
         <button
           class="btn outlined"
-          on:click={() => {
-            t.action?.run();
-            dismiss(t.id);
-          }}
+          on:click={() => { t.action?.run(); dismiss(t.id); }}
         >
           {t.action.label}
         </button>

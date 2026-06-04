@@ -55,6 +55,7 @@ func New(app *application.App, mainWin application.Window, ws *services.Workspac
 }
 
 func (c *Controller) MainWin() application.Window { return c.mainWin }
+func (c *Controller) TrayWin() application.Window { return c.trayWin }
 
 // Rebuild constructs the right-click menu from current workspace + sessions state.
 func (c *Controller) Rebuild() {

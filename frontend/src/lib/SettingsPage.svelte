@@ -30,6 +30,7 @@
   import * as WorkspaceService from "../../bindings/github.com/jp/DelveUI/internal/services/workspaceservice";
   import { showInfo, showError } from "./toast";
   import * as UpdateService from "../../bindings/github.com/jp/DelveUI/internal/updater/service";
+  import ReleaseNotesModal from "./ReleaseNotesModal.svelte";
 
   let updateInfo: any = null;
   let checking = false;
@@ -39,6 +40,7 @@
   let dlBytes = 0;
   let dlTotal = 0;
   let dlError = "";
+  let relNotesOpen = false;
 
   async function checkUpdates() {
     checking = true;
@@ -1033,6 +1035,9 @@
               </div>
 
               {#if updateState === "idle"}
+                <button class="btn sm" on:click={() => (relNotesOpen = true)}>
+                  <Icon icon="solar:document-text-linear" size={11} /> Release Notes
+                </button>
                 <button class="btn primary sm" on:click={downloadUpdate}>
                   <Icon icon="solar:download-minimalistic-bold" size={11} /> Download
                 </button>
@@ -1073,6 +1078,16 @@
             </div>
           {/if}
         </div>
+
+        {#if updateInfo}
+          <ReleaseNotesModal
+            bind:open={relNotesOpen}
+            currentVersion={updateInfo.currentVersion}
+            latestVersion={updateInfo.latestVersion}
+            releaseNotes={updateInfo.releaseNotes ?? ""}
+            releaseUrl={updateInfo.releaseUrl ?? ""}
+          />
+        {/if}
 
         <div class="field" id="general-reset">
           <span class="field-label">Reset</span>

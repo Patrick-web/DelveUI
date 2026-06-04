@@ -6,6 +6,9 @@
     sessionState,
     activeSession,
     activeSessionId,
+    updateInfo,
+    updateInfo as updateInfoStore,
+    type UpdateInfo,
   } from "./store";
   import * as SessionService from "../../bindings/github.com/jp/DelveUI/internal/services/sessionservice";
   import Icon from "./Icon.svelte";
@@ -83,6 +86,22 @@
     } catch { /* ignore */ }
   }
 
+  let relNotesOpen = false;
+  let relNotesCurrentVersion = "";
+  let relNotesLatestVersion = "";
+  let relNotesBody = "";
+  let relNotesUrl = "";
+
+  function openReleaseNotes(info: UpdateInfo) {
+    relNotesCurrentVersion = info.currentVersion;
+    relNotesLatestVersion = info.latestVersion;
+    relNotesBody = info.releaseNotes;
+    relNotesUrl = info.releaseUrl;
+    relNotesOpen = true;
+  }
+
+  import ReleaseNotesModal from "./ReleaseNotesModal.svelte";
+
   onMount(() => {
     refreshStats();
     timer = setInterval(refreshStats, 5000);
@@ -91,6 +110,14 @@
 </script>
 
 <svelte:window on:click={onWindowClick} />
+
+  <ReleaseNotesModal
+    bind:open={relNotesOpen}
+    currentVersion={relNotesCurrentVersion}
+    latestVersion={relNotesLatestVersion}
+    releaseNotes={relNotesBody}
+    releaseUrl={relNotesUrl}
+  />
 
 <footer class="statusbar">
   <div class="left">
@@ -122,6 +149,16 @@
     {#if uptime}
       <span class="sep">·</span>
       <span>{uptime}</span>
+    {/if}
+    {#if $updateInfo}
+      <button
+        class="update-btn"
+        title="Update available: v{$updateInfo.latestVersion}"
+        on:click={() => openReleaseNotes($updateInfo)}
+      >
+        <Icon icon="solar:arrow-up-bold" size={10} />
+        <span>v{$updateInfo.latestVersion}</span>
+      </button>
     {/if}
     <div class="notif" bind:this={notifWrap}>
       <button
@@ -201,6 +238,24 @@
   }
   .notif-btn.has-unread {
     color: var(--text);
+  }
+  .update-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(152, 195, 121, 0.12);
+    border: 1px solid rgba(152, 195, 121, 0.25);
+    color: var(--success);
+    padding: 0 5px;
+    height: 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .update-btn:hover {
+    background: rgba(152, 195, 121, 0.2);
+    border-color: var(--success);
   }
   .badge.unread {
     background: var(--danger);
