@@ -8,6 +8,18 @@
   let loading = false;
   let entries: Entry[] = [];
   let error = "";
+  let filter = "";
+
+  function fuzzy(q: string, s: string): boolean {
+    if (!q) return true;
+    const hay = s.toLowerCase();
+    const needle = q.toLowerCase();
+    let i = 0;
+    for (const c of hay) { if (c === needle[i]) i++; if (i === needle.length) return true; }
+    return false;
+  }
+
+  $: visibleEntries = filter ? entries.filter((e) => fuzzy(filter, e.key) || fuzzy(filter, e.value)) : entries;
   // Files contributing to the current view, in precedence order. Set when
   // the cfg has envFiles[] (discovery walk-up) or a legacy single envFile.
   let sourceFiles: string[] = [];
@@ -137,11 +149,20 @@
         <div class="src-note">Later files override earlier ones.</div>
       </div>
     {/if}
-    {#if entries.length === 0}
-      <div class="empty">No KEY=value entries.</div>
+    <div class="env-filter">
+      <Icon icon="solar:magnifer-linear" size={12} color="var(--text-faint)" />
+      <input class="env-filter-input" placeholder="Filter…" bind:value={filter} spellcheck="false" />
+      {#if filter}
+        <button class="env-clear" title="Clear" on:click={() => (filter = "")}>
+          <Icon icon="solar:close-circle-linear" size={12} />
+        </button>
+      {/if}
+    </div>
+    {#if visibleEntries.length === 0}
+      <div class="empty">{entries.length > 0 ? "No matching entries." : "No KEY=value entries."}</div>
     {:else}
       <div class="rows">
-        {#each entries as e}
+        {#each visibleEntries as e}
           <div class="row" title="Click to copy value" on:click={() => copyValue(e.value)} on:keydown={(ev) => { if (ev.key === 'Enter') copyValue(e.value); }} role="button" tabindex="0">
             <span class="k">{e.key}</span>
             <span class="v">{e.value}</span>
@@ -218,6 +239,43 @@
   .src-idx { color: var(--text-faint); width: 14px; }
   .src-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .src-note { color: var(--text-faint); font-size: 9px; padding-top: 2px; }
+
+  .env-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 6px 4px 6px;
+    padding: 0 8px;
+    height: 26px;
+    background: var(--bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 5px;
+    flex-shrink: 0;
+  }
+  .env-filter:focus-within { border-color: var(--accent); }
+  .env-filter-input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font-size: var(--text-xs);
+    font-family: var(--font-ui);
+    outline: none;
+    padding: 0;
+  }
+  .env-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 0;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+  }
+  .env-clear:hover { color: var(--text); }
 
   .rows {
     flex: 1;

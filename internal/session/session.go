@@ -322,7 +322,11 @@ func enrichedEnv(extraPaths []string) []string {
 		"/opt/homebrew/bin",
 	}
 	if home != "" {
-		paths = append(paths, home+"/.local/bin", home+"/bin")
+		paths = append(paths,
+			home+"/.local/bin",
+			home+"/bin",
+		)
+		paths = append(paths, nvmNodeBinDirs(home)...)
 	}
 	paths = append(paths, extraPaths...)
 
@@ -334,6 +338,26 @@ func enrichedEnv(extraPaths []string) []string {
 	}
 	env = append(env, "PATH="+strings.Join(paths, ":"))
 	return env
+}
+
+// nvmNodeBinDirs returns existing ~/.nvm/versions/node/*/bin directories.
+func nvmNodeBinDirs(home string) []string {
+	nvmDir := home + "/.nvm/versions/node"
+	entries, err := os.ReadDir(nvmDir)
+	if err != nil {
+		return nil
+	}
+	var dirs []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		bin := nvmDir + "/" + e.Name() + "/bin"
+		if info, err := os.Stat(bin); err == nil && info.IsDir() {
+			dirs = append(dirs, bin)
+		}
+	}
+	return dirs
 }
 
 func freePort() (int, error) {

@@ -196,14 +196,44 @@ func (r *Registry) All() []ProcessSpec {
 }
 
 // FindBinary searches for binaryName in PATH first (via exec.LookPath),
-// then in each extraPath/binaryName combination. Returns absolute path
-// or empty string if not found.
+// then in each extraPath/binaryName combination, then in common version
+// manager directories (nvm, pyenv, etc.). Returns absolute path or empty
+// string if not found.
 func FindBinary(binaryName string, extraPaths []string) string {
 	if p, err := exec.LookPath(binaryName); err == nil {
 		return p
 	}
 	for _, dir := range extraPaths {
 		p := dir + "/" + binaryName
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	if binaryName == "node" {
+		if p := findNvmNode(); p != "" {
+			return p
+		}
+	}
+	return ""
+}
+
+// findNvmNode searches ~/.nvm/versions/node/*/bin/node and returns the
+// first match, or empty string if none is found.
+func findNvmNode() string {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		return ""
+	}
+	nvmDir := home + "/.nvm/versions/node"
+	entries, err := os.ReadDir(nvmDir)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		p := nvmDir + "/" + e.Name() + "/bin/node"
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
