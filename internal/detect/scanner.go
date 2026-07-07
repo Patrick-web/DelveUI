@@ -164,6 +164,22 @@ func ScanSync(extraRoots []string) []DetectedSource {
 	return Scan(nil, extraRoots)
 }
 
+func isGitWorktree(dir string) bool {
+	gitPath := filepath.Join(dir, ".git")
+	info, err := os.Lstat(gitPath)
+	if err != nil {
+		return false
+	}
+	if !info.Mode().IsRegular() {
+		return false
+	}
+	data, err := os.ReadFile(gitPath)
+	if err != nil {
+		return false
+	}
+	return strings.HasPrefix(string(data), "gitdir:")
+}
+
 func shortDir(dir, home string) string {
 	if home != "" && strings.HasPrefix(dir, home) {
 		return "~" + dir[len(home):]
@@ -199,6 +215,9 @@ func findConfigsDirect(root string) []DetectedSource {
 				continue
 			}
 			projectDir := filepath.Dir(filepath.Dir(line))
+			if isGitWorktree(projectDir) {
+				continue
+			}
 			if cfgs, err := parseZed(line); err == nil && len(cfgs) > 0 {
 				results = append(results, DetectedSource{
 					Editor: "Zed", ProjectPath: projectDir, ConfigPath: line,
@@ -217,6 +236,9 @@ func findConfigsDirect(root string) []DetectedSource {
 				continue
 			}
 			projectDir := filepath.Dir(filepath.Dir(line))
+			if isGitWorktree(projectDir) {
+				continue
+			}
 			if cfgs, err := parseVSCode(line, projectDir); err == nil && len(cfgs) > 0 {
 				results = append(results, DetectedSource{
 					Editor: "VS Code", ProjectPath: projectDir, ConfigPath: line,
@@ -230,6 +252,9 @@ func findConfigsDirect(root string) []DetectedSource {
 }
 
 func scanProject(dir string) []DetectedSource {
+	if isGitWorktree(dir) {
+		return nil
+	}
 	var sources []DetectedSource
 
 	zedPath := filepath.Join(dir, ".zed", "debug.json")
